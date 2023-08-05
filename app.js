@@ -19,8 +19,7 @@ const client = new Client({
     sslmode: 'require',
     ssl: {
         rejectUnauthorized: false
-    },
-    connectionTimeoutMillis: 5000
+    }
 });
 
 // Connect to Postgres with a callback
@@ -41,7 +40,7 @@ app.get('/', (req, res) => {
 
 // Get all from bus_details
 app.get('/bus_details', (req, res) => {
-    client.query('SELECT * FROM bus_details', (err, result) => {
+    client.query('SELECT * FROM bus_services', (err, result) => {
         if (err) {
             console.log(err);
             res.status(500).send('Error retrieving listings from database');
