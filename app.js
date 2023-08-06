@@ -1,55 +1,15 @@
 const express = require('express');
 const dotenv = require("dotenv")
-const { Pool } = require('pg');
+const router = require('./routes/routes');
 
 dotenv.config()
 
 const app = express();
 const port = process.env.PORT;
 
-// Connect to Postgres
-const client = new Pool({
-    host: process.env.PGHOST,
-    port: process.env.PGPORT,
-    user: process.env.PGUSER,
-    password: process.env.PGPASSWORD,
-    database: process.env.PGDATABASE,
-    idleTimeoutMillis: 0,
-    connectionTimeoutMillis: 0,
-    ssl: {
-        rejectUnauthorized: false
-    }
-});
-
-// Connect to Postgres with a callback
-client.connect((err) => {
-    if (err) {
-        console.log(err);
-    } else {
-        console.log('Connected to database');
-    }
-});
-
-
-
-app.get('/', (req, res) => {
-    res.send('Hello World testing!');
-    }
-);
-
-// Get all from bus_details
-app.get('/bus_details', (req, res) => {
-    client.query('SELECT * FROM bus_services', (err, result) => {
-        if (err) {
-            console.log(err);
-            res.status(500).send('Error retrieving listings from database');
-        } else {
-            res.status(200).send(result.rows);
-        }
-    });
-});
+app.use(express.json());
+app.use('/', router);
 
 app.listen(port, () => {
-    console.log(`Example app listening at http://localhost:${port}`);
-    }
-);
+    console.log(`Account service listening on port ${port}`);
+});
