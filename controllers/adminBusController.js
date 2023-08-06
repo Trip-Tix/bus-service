@@ -31,6 +31,16 @@ const addBusInfo = async (req, res) => {
         console.log("addBusInfo called from bus-service");
         console.log(req.body);
         const {busName, numberOfBus, coachInfo} = req.body;
+        // Check if bus name already exists
+        const checkQuery = {
+            text: 'SELECT * FROM bus_services WHERE bus_name = $1',
+            values: [busName]
+        };
+        const checkResult = await pool.query(checkQuery);
+        if (checkResult.rows.length > 0) {
+            console.log("Bus name already exists");
+            return res.status(400).json({ message: 'Bus name already exists' });
+        }
         const query = {
             text: 'INSERT INTO bus_services (bus_name, number_of_buses, coaches_info) VALUES ($1, $2, $3)',
             values: [busName, numberOfBus, coachInfo]
@@ -77,9 +87,26 @@ const getCoachInfo = async (req, res) => {
     }
 }
 
+// Get Bus Info
+const getBusInfo = async (req, res) => {
+    try {
+        console.log("getBusInfo called from bus-service");
+        const query = {
+            text: 'SELECT * FROM bus_services'
+        };
+        const result = await pool.query(query);
+        const busInfo = result.rows;
+        console.log(busInfo);
+        res.status(200).json(busInfo);
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+}
+
 
 module.exports = {
     addBusInfo,
     addCoachInfo,
-    getCoachInfo
+    getCoachInfo,
+    getBusInfo
 }

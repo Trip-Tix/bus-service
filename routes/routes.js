@@ -13,4 +13,7 @@ router.post('/api/admin/addCoachInfo', bodyParser, adminBusController.addCoachIn
 // Get coach info from admin
 router.get('/api/admin/getCoachInfo', adminBusController.getCoachInfo);
 
+// Get bus info from admin
+router.get('/api/admin/getBusInfo', adminBusController.getBusInfo);
+
 module.exports = router;
