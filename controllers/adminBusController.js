@@ -169,6 +169,137 @@ const addBusLayoutInfo = async (req, res) => {
     }
 }
 
+// Add bus schedule info with bus id, source, destination, departure time, arrival time, fare and date
+const addBusScheduleInfo = async (req, res) => {
+    try {
+        // Begin transaction
+        await pool.query('BEGIN');
+        console.log("addBusScheduleInfo called from bus-service");
+
+        /*
+        {
+        "schedule" : [
+            {
+                "date" : "07-08-2023",
+                "timeWiseInfo" : [
+                    {
+                        "departureTime" : "8:10 AM",
+                        "arrivingTime" : "12:00 PM",
+                        "coachId" : 103,
+                        "fare" : 400,
+                        "source" : "Dhaka",
+                        "destination" : "Mymensingh"
+                    } , 
+                    {
+                        "departureTime" : "9:00 AM",
+                        "arrivingTime" : "",
+                        "coachId" : 103,
+                        "fare" : 400,
+                        "source" : "Dhaka",
+                        "destination" : "Mymensingh"
+                    }
+                ]
+            }, 
+            {
+                "date" : "08-08-2023",
+                "timeWiseInfo" : [
+                    {
+                        "departureTime" : "9:00 AM",
+                        "arrivingTime" : "",
+                        "coachId" : 102,
+                        "fare" : 300,
+                        "source" : "Dhaka",
+                        "destination" : "Jamalpur"
+                    } , 
+                    {
+                        "departureTime" : "10:00 AM",
+                        "arrivingTime" : "3:00 PM",
+                        "coachId" : 100,
+                        "fare" : 500,
+                        "source" : "Dhaka",
+                        "destination" : "Kishoreganj"
+                    }
+                ]
+            }
+        ],
+        "busId" : 100
+        }
+        */
+        
+        const {schedule, busId} = req.body;
+        for (let i = 0; i < schedule.length; i++) {
+            const {date, timeWiseInfo} = schedule[i];
+            for (let j = 0; j < timeWiseInfo.length; j++) {
+                const {departureTime, arrivingTime, coachId, fare, source, destination} = timeWiseInfo[j];
+                // Check if bus schedule already exists
+                const checkQuery = {
+                    text: 'SELECT * FROM bus_schedule_info WHERE bus_id = $1 AND source = $2 AND destination = $3 AND departure_time = $4 AND coach_id = $5 AND schedule_date = $6',
+                    values: [busId, source, destination, departureTime, coachId, date]
+                };
+                const checkResult = await pool.query(checkQuery);
+                if (checkResult.rows.length > 0) {
+                    console.log("Bus schedule already exists");
+
+                    // Rollback transaction
+                    await pool.query('ROLLBACK');
+                    return res.status(400).json({ message: 'Bus schedule already exists' });
+                }
+                
+                // Check if bus layout exists
+                const checkQuery2 = {
+                    text: 'SELECT * FROM bus_layout_info WHERE bus_id = $1 AND coach_id = $2',
+                    values: [busId, coachId]
+                };
+                const checkResult2 = await pool.query(checkQuery2);
+                if (checkResult2.rows.length === 0) {
+                    console.log("Bus layout does not exist");
+                    return res.status(400).json({ message: 'Bus layout does not exist' });
+                }
+
+                // Get the bus layout id
+                const busLayoutId = checkResult2.rows[0].bus_layout_id;
+
+                // Add bus schedule info
+                const query = {
+                    text: 'INSERT INTO bus_schedule_info (bus_id, source, destination, departure_time, arrival_time, bus_fare, coach_id, schedule_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+                    values: [busId, source, destination, departureTime, arrivingTime, fare, coachId, date]
+                };
+                await pool.query(query);
+                console.log("Bus schedule added");
+
+                // Get the bus schedule id
+                const getQuery = {
+                    text: 'SELECT * FROM bus_schedule_info WHERE bus_id = $1 AND source = $2 AND destination = $3 AND departure_time = $4 AND coach_id = $5 AND schedule_date = $6',
+                    values: [busId, source, destination, departureTime, coachId, date]
+                };
+                const getResult = await pool.query(getQuery);
+                const busScheduleId = getResult.rows[0].bus_schedule_id;
+
+                // Insert into bus schedule seat info table with bus schedule id and bus layout id and the seat details selecting from seat details table with bus layout id
+                const insertQuery = {
+                    text: 'INSERT INTO bus_schedule_seat_info (bus_schedule_id, bus_layout_id, bus_seat_id, seat_status) SELECT $1, $2, bus_seat_id, booked_status FROM bus_seat_details WHERE bus_layout_id = $3 and is_seat = 1',
+                    values: [busScheduleId, busLayoutId, busLayoutId]
+                };
+                await pool.query(insertQuery);
+                console.log("Bus schedule seat info added");
+            }
+        }
+
+        console.log("Bus schedule details added");
+        res.status(200).json({ message: 'Bus schedule added' });
+    } catch (error) {
+        console.log(error);
+        // Rollback transaction
+        await pool.query('ROLLBACK');
+        res.status(500).json({ message: error.message });
+    } finally {
+        // End transaction
+        await pool.query('COMMIT');
+    }
+}
+
+
+
 
 
 module.exports = {
@@ -176,5 +307,6 @@ module.exports = {
     addCoachInfo,
     getCoachInfo,
     getBusInfo,
-    addBusLayoutInfo
+    addBusLayoutInfo,
+    addBusScheduleInfo
 }
