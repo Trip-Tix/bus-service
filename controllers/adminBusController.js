@@ -45,8 +45,9 @@ const addBusInfo = async (req, res) => {
             text: 'INSERT INTO bus_services (bus_name, number_of_buses, coaches_info) VALUES ($1, $2, $3)',
             values: [busName, numberOfBus, coachInfo]
         };
-        await pool.query(query);
+        const result = await pool.query(query);
         console.log("Bus added");
+        console.log(result);
         res.status(200).json({ message: 'Bus added' });
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -307,7 +308,7 @@ const getScheduleWiseBusDetails = async (req, res) => {
         };
         const result = await pool.query(query);
         console.log("Schedule wise bus details fetched");
-        res.status(200).json(result.rows);
+        res.status(200).json({ data: result.rows });
     } catch (error) {
         console.log(error);
         res.status(500).json({ message: error.message });
