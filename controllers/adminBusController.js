@@ -323,7 +323,7 @@ const getScheduleWiseBusDetails = async (req, res) => {
         };
         const result = await pool.query(query);
         console.log("Schedule wise bus details fetched");
-        res.status(200).json({ data: result.rows });
+        res.status(200).json(result.rows);
     } catch (error) {
         console.log(error);
         res.status(500).json({ message: error.message });
