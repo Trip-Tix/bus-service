@@ -22,4 +22,7 @@ router.post('/api/admin/addBusLayoutInfo', bodyParser, adminBusController.addBus
 // Add bus schedule info from admin
 router.post('/api/admin/addBusScheduleInfo', bodyParser, adminBusController.addBusScheduleInfo);
 
+// Get bus schedule info from admin
+router.get('/api/admin/getScheduleWiseBusDetails', adminBusController.getScheduleWiseBusDetails);
+
 module.exports = router;

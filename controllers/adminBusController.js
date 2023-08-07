@@ -298,8 +298,21 @@ const addBusScheduleInfo = async (req, res) => {
     }
 }
 
-
-
+// Get schedule wise bus details: bus name, coach name, source, destination, departure time, bus fare from bus schedule info table, bus info table, coach info table
+const getScheduleWiseBusDetails = async (req, res) => {
+    try {
+        console.log("getScheduleWiseBusDetails called from bus-service");
+        const query = {
+            text: 'SELECT bus_schedule_info.bus_schedule_id, bus_services.bus_name, coach_info.coach_name, bus_schedule_info.source, bus_schedule_info.destination, bus_schedule_info.departure_time, bus_schedule_info.arrival_time, bus_schedule_info.bus_fare, bus_schedule_info.schedule_date FROM bus_schedule_info INNER JOIN bus_services ON bus_schedule_info.bus_id = bus_services.bus_id INNER JOIN coach_info ON bus_schedule_info.coach_id = coach_info.coach_id'
+        };
+        const result = await pool.query(query);
+        console.log("Schedule wise bus details fetched");
+        res.status(200).json(result.rows);
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: error.message });
+    }
+}
 
 
 module.exports = {
@@ -308,5 +321,6 @@ module.exports = {
     getCoachInfo,
     getBusInfo,
     addBusLayoutInfo,
-    addBusScheduleInfo
+    addBusScheduleInfo,
+    getScheduleWiseBusDetails
 }
