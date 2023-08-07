@@ -1,7 +1,10 @@
 const { Pool } = require('pg');
 const dotenv = require('dotenv');
+const jwt = require('jsonwebtoken');
 
 dotenv.config();
+
+const secretKey = process.env.SECRETKEY;
 
 // Connect to Postgres
 const pool = new Pool({
@@ -74,6 +77,18 @@ const addCoachInfo = async (req, res) => {
 
 // Get Coach Info
 const getCoachInfo = async (req, res) => {
+    // get the token
+    // console.log(req)
+    // const token = req.headers.authorization?.split(' ')[1];
+    // if (!token) {
+    //     return res.status(401).json({ message: 'No token provided' });
+    // }
+    // // verify the token
+    // jwt.verify(token, secretKey, async (err, decoded) => {
+    //     if (err) {
+    //         return res.status(401).json({ message: 'Unauthorized access' });
+    //     }
+    // });
     try {
         console.log("getCoachInfo called from bus-service");
         const query = {
