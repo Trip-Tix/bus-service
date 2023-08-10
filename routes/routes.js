@@ -11,10 +11,10 @@ router.post('/api/admin/addBusInfo', bodyParser, adminBusController.addBusInfo);
 router.post('/api/admin/addCoachInfo', bodyParser, adminBusController.addCoachInfo);
 
 // Get coach info from admin
-router.get('/api/admin/getCoachInfo', adminBusController.getCoachInfo);
+router.post('/api/admin/getCoachInfo', bodyParser, adminBusController.getCoachInfo);
 
 // Get bus info from admin
-router.get('/api/admin/getBusInfo', adminBusController.getBusInfo);
+router.post('/api/admin/getBusInfo', adminBusController.getBusInfo);
 
 // Add bus layout info from admin
 router.post('/api/admin/addBusLayoutInfo', bodyParser, adminBusController.addBusLayoutInfo);
@@ -23,6 +23,6 @@ router.post('/api/admin/addBusLayoutInfo', bodyParser, adminBusController.addBus
 router.post('/api/admin/addBusScheduleInfo', bodyParser, adminBusController.addBusScheduleInfo);
 
 // Get bus schedule info from admin
-router.get('/api/admin/getScheduleWiseBusDetails', adminBusController.getScheduleWiseBusDetails);
+router.post('/api/admin/getScheduleWiseBusDetails', adminBusController.getScheduleWiseBusDetails);
 
 module.exports = router;

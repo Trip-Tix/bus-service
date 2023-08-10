@@ -79,28 +79,34 @@ const addCoachInfo = async (req, res) => {
 const getCoachInfo = async (req, res) => {
     // get the token
     // console.log(req)
+    const token = req.body.token;
     // const token = req.headers.authorization?.split(' ')[1];
-    // if (!token) {
-    //     return res.status(401).json({ message: 'No token provided' });
-    // }
-    // // verify the token
-    // jwt.verify(token, secretKey, async (err, decoded) => {
-    //     if (err) {
-    //         return res.status(401).json({ message: 'Unauthorized access' });
-    //     }
-    // });
-    try {
-        console.log("getCoachInfo called from bus-service");
-        const query = {
-            text: 'SELECT * FROM coach_info'
-        };
-        const result = await pool.query(query);
-        const coachInfo = result.rows;
-        console.log(coachInfo);
-        res.status(200).json(coachInfo);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided' });
     }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access");
+            res.status(401).json({ message: 'Unauthorized access' });
+        } else {
+            try {
+                console.log("getCoachInfo called from bus-service");
+                const query = {
+                    text: 'SELECT * FROM coach_info'
+                };
+                const result = await pool.query(query);
+                const coachInfo = result.rows;
+                console.log(coachInfo);
+                res.status(200).json(coachInfo);
+            } catch (error) {
+                res.status(500).json({ message: error.message });
+            }
+        }
+    });
 }
 
 // Get Bus Info
