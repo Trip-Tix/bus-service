@@ -229,7 +229,7 @@ const addBusScheduleInfo = async (req, res) => {
         // Begin transaction
         await pool.query('BEGIN');
         console.log("addBusScheduleInfo called from bus-service");
-                
+
         const {schedule, busId} = req.body;
         for (let i = 0; i < schedule.length; i++) {
             const {date, timeWiseInfo} = schedule[i];
@@ -357,6 +357,17 @@ const removeBusScheduleInfo = async (req, res) => {
             try {
                 console.log("removeBusScheduleInfo called from bus-service");
                 const busScheduleId = req.body.busScheduleId;
+                // Check if the bus schedule id exists
+                const checkQuery = {
+                    text: 'SELECT * FROM bus_schedule_info WHERE bus_schedule_id = $1',
+                    values: [busScheduleId]
+                };
+                const checkResult = await pool.query(checkQuery);
+                if (checkResult.rows.length === 0) {
+                    return res.status(400).json({ message: 'Bus schedule does not exist' });
+                }
+                
+                // Remove bus schedule info
                 const query = {
                     text: 'UPDATE bus_schedule_info SET schedule_status = 0 WHERE bus_schedule_id = $1',
                     values: [busScheduleId]
