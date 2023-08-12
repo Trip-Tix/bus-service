@@ -59,20 +59,52 @@ const addBusInfo = async (req, res) => {
 
 // Add coach info with coach name
 const addCoachInfo = async (req, res) => {
-    try {
-        console.log("addCoachInfo called from bus-service");
-        console.log(req.body);
-        const {coachName} = req.body;
-        const query = {
-            text: 'INSERT INTO coach_info (coach_name) VALUES ($1)',
-            values: [coachName]
-        };
-        await pool.query(query);
-        console.log("Coach added");
-        res.status(200).json({ message: 'Coach added' });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    // get the token
+    // console.log(req)
+    const {token} = req.body;
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided' });
     }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access");
+            res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        } else {
+            try {
+                console.log("addCoachInfo called from bus-service");
+                console.log(req.body);
+                const {coachName, adminRole} = req.body;
+                // Check admin role
+                if (adminRole !== 'ADMIN' && adminRole !== 'BUS ADMIN') {
+                    console.log("Unauthorized access");
+                    return res.status(401).json({ message: 'Unauthorized access: admin role invalid' });
+                }
+                // Check if coach name already exists
+                const checkQuery = {
+                    text: 'SELECT * FROM coach_info WHERE coach_name = $1',
+                    values: [coachName]
+                };
+                const checkResult = await pool.query(checkQuery);
+                if (checkResult.rows.length > 0) {
+                    console.log("Coach name already exists");
+                    return res.status(400).json({ message: 'Coach name already exists' });
+                }
+                const query = {
+                    text: 'INSERT INTO coach_info (coach_name) VALUES ($1)',
+                    values: [coachName]
+                };
+                await pool.query(query);
+                console.log("Coach added");
+                res.status(200).json({ message: 'Bus Coach added' });
+            } catch (error) {
+                res.status(500).json({ message: error.message });
+            }
+        }
+    });
 }
 
 // Get Coach Info
@@ -171,8 +203,8 @@ const addBusLayoutInfo = async (req, res) => {
                     colCount++;
                 }
                 const query = {
-                    text: 'INSERT INTO bus_seat_details (bus_layout_id, seat_name, booked_status, is_seat, matrix_row_id, matrix_col_id) VALUES ($1, $2, $3, $4, $5, $6)',
-                    values: [busLayoutId, seat_name, 0, matrix[i][j], i, j]
+                    text: 'INSERT INTO bus_seat_details (bus_layout_id, seat_name, is_seat, matrix_row_id, matrix_col_id) VALUES ($1, $2, $3, $4, $5)',
+                    values: [busLayoutId, seat_name, matrix[i][j], i, j]
                 };
                 await pool.query(query);
             }
@@ -197,57 +229,7 @@ const addBusScheduleInfo = async (req, res) => {
         // Begin transaction
         await pool.query('BEGIN');
         console.log("addBusScheduleInfo called from bus-service");
-
-        /*
-        {
-        "schedule" : [
-            {
-                "date" : "07-08-2023",
-                "timeWiseInfo" : [
-                    {
-                        "departureTime" : "8:10 AM",
-                        "arrivingTime" : "12:00 PM",
-                        "coachId" : 103,
-                        "fare" : 400,
-                        "source" : "Dhaka",
-                        "destination" : "Mymensingh"
-                    } , 
-                    {
-                        "departureTime" : "9:00 AM",
-                        "arrivingTime" : "",
-                        "coachId" : 103,
-                        "fare" : 400,
-                        "source" : "Dhaka",
-                        "destination" : "Mymensingh"
-                    }
-                ]
-            }, 
-            {
-                "date" : "08-08-2023",
-                "timeWiseInfo" : [
-                    {
-                        "departureTime" : "9:00 AM",
-                        "arrivingTime" : "",
-                        "coachId" : 102,
-                        "fare" : 300,
-                        "source" : "Dhaka",
-                        "destination" : "Jamalpur"
-                    } , 
-                    {
-                        "departureTime" : "10:00 AM",
-                        "arrivingTime" : "3:00 PM",
-                        "coachId" : 100,
-                        "fare" : 500,
-                        "source" : "Dhaka",
-                        "destination" : "Kishoreganj"
-                    }
-                ]
-            }
-        ],
-        "busId" : 100
-        }
-        */
-        
+                
         const {schedule, busId} = req.body;
         for (let i = 0; i < schedule.length; i++) {
             const {date, timeWiseInfo} = schedule[i];
@@ -299,7 +281,7 @@ const addBusScheduleInfo = async (req, res) => {
 
                 // Insert into bus schedule seat info table with bus schedule id and bus layout id and the seat details selecting from seat details table with bus layout id
                 const insertQuery = {
-                    text: 'INSERT INTO bus_schedule_seat_info (bus_schedule_id, bus_layout_id, bus_seat_id, seat_status) SELECT $1, $2, bus_seat_id, booked_status FROM bus_seat_details WHERE bus_layout_id = $3 and is_seat = 1',
+                    text: 'INSERT INTO bus_schedule_seat_info (bus_schedule_id, bus_layout_id, bus_seat_id) SELECT $1, $2, bus_seat_id FROM bus_seat_details WHERE bus_layout_id = $3 and is_seat = 1',
                     values: [busScheduleId, busLayoutId, busLayoutId]
                 };
                 await pool.query(insertQuery);
@@ -322,18 +304,72 @@ const addBusScheduleInfo = async (req, res) => {
 
 // Get schedule wise bus details: bus name, coach name, source, destination, departure time, bus fare from bus schedule info table, bus info table, coach info table
 const getScheduleWiseBusDetails = async (req, res) => {
-    try {
-        console.log("getScheduleWiseBusDetails called from bus-service");
-        const query = {
-            text: 'SELECT bus_schedule_info.bus_schedule_id, bus_services.bus_name, coach_info.coach_name, bus_schedule_info.source, bus_schedule_info.destination, bus_schedule_info.departure_time, bus_schedule_info.arrival_time, bus_schedule_info.bus_fare, bus_schedule_info.schedule_date FROM bus_schedule_info INNER JOIN bus_services ON bus_schedule_info.bus_id = bus_services.bus_id INNER JOIN coach_info ON bus_schedule_info.coach_id = coach_info.coach_id'
-        };
-        const result = await pool.query(query);
-        console.log("Schedule wise bus details fetched");
-        res.status(200).json(result.rows);
-    } catch (error) {
-        console.log(error);
-        res.status(500).json({ message: error.message });
+    // get the token
+    // console.log(req)
+    const token = req.body.token;
+    // const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided' });
     }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access");
+            res.status(401).json({ message: 'Unauthorized access: Invalid Token' });
+        } else {
+            try {
+                console.log("getScheduleWiseBusDetails called from bus-service");
+                const query = {
+                    text: 'SELECT bus_schedule_info.bus_schedule_id, bus_services.bus_name, coach_info.coach_name, bus_schedule_info.source, bus_schedule_info.destination, bus_schedule_info.departure_time, bus_schedule_info.arrival_time, bus_schedule_info.bus_fare, bus_schedule_info.schedule_date FROM bus_schedule_info INNER JOIN bus_services ON bus_schedule_info.bus_id = bus_services.bus_id INNER JOIN coach_info ON bus_schedule_info.coach_id = coach_info.coach_id WHERE bus_schedule_info.schedule_status = 1 ORDER BY bus_schedule_info.schedule_date DESC'
+                };
+                const result = await pool.query(query);
+                console.log("Schedule wise bus details fetched");
+                res.status(200).json(result.rows);
+            } catch (error) {
+                console.log(error);
+                res.status(500).json({ message: error.message });
+            }
+        }
+    });
+}
+
+// Remove bus schedule info
+const removeBusScheduleInfo = async (req, res) => {
+    // get the token
+    // console.log(req)
+    const token = req.body.token;
+    // const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access");
+            res.status(401).json({ message: 'Unauthorized access: Invalid Token' });
+        } else {
+            try {
+                console.log("removeBusScheduleInfo called from bus-service");
+                const busScheduleId = req.body.busScheduleId;
+                const query = {
+                    text: 'UPDATE bus_schedule_info SET schedule_status = 0 WHERE bus_schedule_id = $1',
+                    values: [busScheduleId]
+                };
+                await pool.query(query);
+                console.log("Bus schedule info removed");
+                res.status(200).json({ message: 'Bus schedule info removed' });
+            } catch (error) {
+                console.log(error);
+                res.status(500).json({ message: error.message });
+            }
+        }
+    });
 }
 
 
@@ -344,5 +380,6 @@ module.exports = {
     getBusInfo,
     addBusLayoutInfo,
     addBusScheduleInfo,
-    getScheduleWiseBusDetails
+    getScheduleWiseBusDetails,
+    removeBusScheduleInfo
 }

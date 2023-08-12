@@ -25,4 +25,7 @@ router.post('/api/admin/addBusScheduleInfo', bodyParser, adminBusController.addB
 // Get bus schedule info from admin
 router.post('/api/admin/getScheduleWiseBusDetails', adminBusController.getScheduleWiseBusDetails);
 
+// Remove bus schedule info from admin
+router.post('/api/admin/removeBusScheduleInfo', bodyParser, adminBusController.removeBusScheduleInfo);
+
 module.exports = router;
