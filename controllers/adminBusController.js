@@ -30,31 +30,72 @@ pool.connect(err => {
 
 // Add bus info with bus name, number of buses and coach info
 const addBusInfo = async (req, res) => {
-    try {
-        console.log("addBusInfo called from bus-service");
-        console.log(req.body);
-        const {busName, numberOfBus, coachInfo} = req.body;
-        // Check if bus name already exists
-        const checkQuery = {
-            text: 'SELECT * FROM bus_services WHERE bus_name = $1',
-            values: [busName]
-        };
-        const checkResult = await pool.query(checkQuery);
-        if (checkResult.rows.length > 0) {
-            console.log("Bus name already exists");
-            return res.status(400).json({ message: 'Bus name already exists' });
-        }
-        const query = {
-            text: 'INSERT INTO bus_services (bus_name, number_of_buses, coaches_info) VALUES ($1, $2, $3)',
-            values: [busName, numberOfBus, coachInfo]
-        };
-        const result = await pool.query(query);
-        console.log("Bus added");
-        console.log(result);
-        res.status(200).json({ message: 'Bus added' });
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    // get the token
+    // console.log(req)
+    const {token} = req.body;
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided' });
     }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access");
+            res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        } else {
+            try {
+                // Begin transaction
+                await pool.query('BEGIN');
+                console.log("addBusInfo called from bus-service");
+                console.log(req.body);
+                const {busName, totalNumberOfBuses, coachInfo} = req.body;
+                // Check if bus name already exists
+                const checkQuery = {
+                    text: 'SELECT * FROM bus_services WHERE bus_name = $1',
+                    values: [busName]
+                };
+                const checkResult = await pool.query(checkQuery);
+                if (checkResult.rows.length > 0) {
+                    console.log("Bus name already exists");
+                    return res.status(400).json({ message: 'Bus name already exists' });
+                }
+
+                // Get the coach id array from coachInfo array of objects
+                const coachIdArray = coachInfo.map(coach => coach.coachId);
+                const query = {
+                    text: 'INSERT INTO bus_services (bus_name, number_of_buses, coaches_info) VALUES ($1, $2, $3)',
+                    values: [busName, totalNumberOfBuses, coachIdArray]
+                };
+                const result = await pool.query(query);
+                console.log("Bus added");
+                console.log(result);
+
+                // Add the bus id and coach id and coach wise number of buses to bus_coach_info table
+                const busId = result.rows[0].bus_id;
+                for (let i = 0; i < coachInfo.length; i++) {
+                    const coachId = coachInfo[i].coachId;
+                    const numberOfBuses = coachInfo[i].numberOfBuses;
+                    const busCoachQuery = {
+                        text: 'INSERT INTO bus_coach_info (bus_id, coach_id, number_of_buses) VALUES ($1, $2, $3)',
+                        values: [busId, coachId, numberOfBuses]
+                    };
+                    await pool.query(busCoachQuery);
+                }
+                console.log("Bus Coach added");
+                res.status(200).json({ message: 'Bus information added' });
+            } catch (error) {
+                // Rollback transaction
+                await pool.query('ROLLBACK');
+                console.log(error);
+                res.status(500).json({ message: error.message });
+            } finally {
+                // End transaction
+                await pool.query('COMMIT');
+            }
+        }
+    });
 }
 
 // Add coach info with coach name
@@ -143,18 +184,36 @@ const getCoachInfo = async (req, res) => {
 
 // Get Bus Info
 const getBusInfo = async (req, res) => {
-    try {
-        console.log("getBusInfo called from bus-service");
-        const query = {
-            text: 'SELECT * FROM bus_services'
-        };
-        const result = await pool.query(query);
-        const busInfo = result.rows;
-        console.log(busInfo);
-        res.status(200).json(busInfo);
-    } catch (error) {
-        res.status(500).json({ message: error.message });
+    // get the token
+    // console.log(req)
+    const {token} = req.body;
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided' });
     }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access");
+            res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        } else {
+            try {
+                console.log("getBusInfo called from bus-service");
+                // Get bus info from bus_services table and bus_coach_info table
+                const query = {
+                    text: 'SELECT * FROM bus_services INNER JOIN bus_coach_info ON bus_services.bus_id = bus_coach_info.bus_id'
+                };
+                const result = await pool.query(query);
+                const busInfo = result.rows;
+                console.log(busInfo);
+                res.status(200).json(busInfo);
+            } catch (error) {
+                res.status(500).json({ message: error.message });
+            }
+        }
+    });
 }
 
 // Add bus layout info with bus id, coach id and layout details
