@@ -208,12 +208,39 @@ const getBusInfo = async (req, res) => {
         } else {
             try {
                 console.log("getBusInfo called from bus-service");
-                // Get bus info from bus_services table and bus_coach_info table
+                // Get bus_id, bus_name, coach_id, coach_name, total_number_of_buses, number_of_buses from bus_services table and bus_coach_info table
                 const query = {
-                    text: 'SELECT * FROM bus_services INNER JOIN bus_coach_info ON bus_services.bus_id = bus_coach_info.bus_id'
+                    text: 'SELECT bus_services.bus_id, bus_services.bus_name, bus_coach_info.coach_id, coach_info.coach_name, bus_coach_info.number_of_buses,bus_services.number_of_buses as total_number_of_buses FROM bus_services INNER JOIN bus_coach_info ON bus_services.bus_id = bus_coach_info.bus_id INNER JOIN coach_info ON bus_coach_info.coach_id = coach_info.coach_id'
                 };
                 const result = await pool.query(query);
-                const busInfo = result.rows;
+                let busInfo = result.rows;
+
+                let busInfoMap = {};
+                busInfo.forEach((bus) => {
+                    if (busInfoMap[bus.bus_id]) {
+                        busInfoMap[bus.bus_id].coach.push({
+                            coach_id: bus.coach_id,
+                            coach_name: bus.coach_name,
+                            number_of_buses: bus.number_of_buses
+                        });
+                    } else {
+                        busInfoMap[bus.bus_id] = {
+                            bus_id: bus.bus_id,
+                            bus_name: bus.bus_name,
+                            total_number_of_buses: bus.total_number_of_buses,
+                            coach: [{
+                                coach_id: bus.coach_id,
+                                coach_name: bus.coach_name,
+                                number_of_buses: bus.number_of_buses
+                            }]
+                        };
+                    }
+                });
+                busInfo = [];
+                for (let busId in busInfoMap) {
+                    busInfo.push(busInfoMap[busId]);
+                }
+
                 console.log(busInfo);
                 res.status(200).json(busInfo);
             } catch (error) {
@@ -323,6 +350,8 @@ const addBusScheduleInfo = async (req, res) => {
                 const checkResult2 = await pool.query(checkQuery2);
                 if (checkResult2.rows.length === 0) {
                     console.log("Bus layout does not exist");
+                    // Rollback transaction
+                    await pool.query('ROLLBACK');
                     return res.status(400).json({ message: 'Bus layout does not exist' });
                 }
 
