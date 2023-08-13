@@ -73,10 +73,17 @@ const addBusInfo = async (req, res) => {
                 console.log(result);
 
                 // Add the bus id and coach id and coach wise number of buses to bus_coach_info table
-                const busId = result.rows[0].bus_id;
+                // Get the bus id
+                const busIdQuery = {
+                    text: 'SELECT bus_id FROM bus_services WHERE bus_name = $1',
+                    values: [busName]
+                };
+                const busIdResult = await pool.query(busIdQuery);
+                const busId = busIdResult.rows[0].bus_id;
+                console.log("Bus id", busId);
                 for (let i = 0; i < coachInfo.length; i++) {
-                    const coachId = coachInfo[i].coachId;
-                    const numberOfBuses = coachInfo[i].numberOfBuses;
+                    let coachId = coachInfo[i].coachId;
+                    let numberOfBuses = coachInfo[i].numberOfBuses;
                     const busCoachQuery = {
                         text: 'INSERT INTO bus_coach_info (bus_id, coach_id, number_of_buses) VALUES ($1, $2, $3)',
                         values: [busId, coachId, numberOfBuses]
