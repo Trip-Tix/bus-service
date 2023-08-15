@@ -50,7 +50,7 @@ const addBusInfo = async (req, res) => {
                 await pool.query('BEGIN');
                 console.log("addBusInfo called from bus-service");
                 console.log(req.body);
-                const {busName, totalNumberOfBuses, coachInfo} = req.body;
+                const {busName, totalNumberOfBuses, adminId, coachInfo} = req.body;
                 // Check if bus name already exists
                 const checkQuery = {
                     text: 'SELECT * FROM bus_services WHERE bus_name = $1',
@@ -65,8 +65,8 @@ const addBusInfo = async (req, res) => {
                 // Get the coach id array from coachInfo array of objects
                 const coachIdArray = coachInfo.map(coach => coach.coachId);
                 const query = {
-                    text: 'INSERT INTO bus_services (bus_name, number_of_buses, coaches_info) VALUES ($1, $2, $3)',
-                    values: [busName, totalNumberOfBuses, coachIdArray]
+                    text: 'INSERT INTO bus_services (bus_name, number_of_buses, admin_id, coaches_info) VALUES ($1, $2, $3, $4)',
+                    values: [busName, totalNumberOfBuses, adminId, coachIdArray]
                 };
                 const result = await pool.query(query);
                 console.log("Bus added");
@@ -208,14 +208,39 @@ const getBusInfo = async (req, res) => {
         } else {
             try {
                 console.log("getBusInfo called from bus-service");
-                // Get bus_id, bus_name, coach_id, coach_name, total_number_of_buses, number_of_buses from bus_services table and bus_coach_info table
-                const query = {
-                    text: `SELECT bus_services.bus_id, bus_services.bus_name, 
-                    bus_coach_info.coach_id, coach_info.coach_name, 
-                    bus_coach_info.number_of_buses,bus_services.number_of_buses as total_number_of_buses 
-                    FROM bus_services INNER JOIN bus_coach_info ON bus_services.bus_id = bus_coach_info.bus_id 
-                    INNER JOIN coach_info ON bus_coach_info.coach_id = coach_info.coach_id`
+                const {adminId} = req.body;
+                // Check if admin has bus admin role or admin role
+                const checkQuery = {
+                    text: 'SELECT * FROM admin_info WHERE admin_id = $1',
+                    values: [adminId]
                 };
+                const checkResult = await pool.query(checkQuery);
+                if (checkResult.rows.length === 0) {
+                    console.log("Admin does not exist");
+                    return res.status(400).json({ message: 'Admin does not exist' });
+                }
+                const adminRole = checkResult.rows[0].admin_role;
+                if (adminRole !== 'ADMIN' && adminRole !== 'BUS ADMIN') {
+                    console.log("Unauthorized access");
+                    return res.status(401).json({ message: 'Unauthorized access: admin role invalid' });
+                }
+
+                // Get bus_id, bus_name, coach_id, coach_name, total_number_of_buses, number_of_buses from bus_services table and bus_coach_info table
+                let queryText = `SELECT bus_services.bus_id, bus_services.bus_name, 
+                                bus_coach_info.coach_id, coach_info.coach_name, 
+                                bus_coach_info.number_of_buses,bus_services.number_of_buses as total_number_of_buses 
+                                FROM bus_services INNER JOIN bus_coach_info ON bus_services.bus_id = bus_coach_info.bus_id 
+                                INNER JOIN coach_info ON bus_coach_info.coach_id = coach_info.coach_id`;
+                let queryValues = [];
+                if (adminRole === 'BUS ADMIN') {
+                    queryText += ' WHERE bus_services.admin_id = $1';
+                    queryValues.push(adminId);
+                }
+                const query = {
+                    text: queryText,
+                    values: queryValues
+                };
+                
                 const result = await pool.query(query);
                 let busInfo = result.rows;
 
@@ -258,7 +283,7 @@ const getBusInfo = async (req, res) => {
 const singleBusDetails = async (req, res) => {
     // get the token
     // console.log(req)
-    const {token, busId} = req.body;
+    const {token, busId, adminId} = req.body;
     if (!token) {
         return res.status(401).json({ message: 'No token provided' });
     }
@@ -274,17 +299,40 @@ const singleBusDetails = async (req, res) => {
         } else {
             try {
                 console.log("singleBusDetails called from bus-service");
+                // Check if admin has bus admin role or admin role
+                const checkQuery = {
+                    text: 'SELECT * FROM admin_info WHERE admin_id = $1',
+                    values: [adminId]
+                };
+                const checkResult = await pool.query(checkQuery);
+                if (checkResult.rows.length === 0) {
+                    console.log("Admin does not exist");
+                    return res.status(400).json({ message: 'Admin does not exist' });
+                }
+                const adminRole = checkResult.rows[0].admin_role;
+                if (adminRole !== 'ADMIN' && adminRole !== 'BUS ADMIN') {
+                    console.log("Unauthorized access");
+                    return res.status(401).json({ message: 'Unauthorized access: admin role invalid' });
+                }
+
+                let queryText = `SELECT bus_services.bus_id, bus_services.bus_name, 
+                                bus_schedule_info.schedule_date, bus_schedule_info.departure_time, bus_schedule_info.arrival_time, 
+                                bus_schedule_info.source, bus_schedule_info.destination, bus_schedule_info.bus_fare, bus_schedule_info.coach_id, 
+                                bus_schedule_info.bus_schedule_id, coach_info.coach_name 
+                                FROM bus_services INNER JOIN bus_schedule_info ON bus_services.bus_id = bus_schedule_info.bus_id 
+                                INNER JOIN coach_info ON bus_schedule_info.coach_id = coach_info.coach_id 
+                                WHERE bus_services.bus_id = $1 
+                                AND bus_schedule_info.schedule_status = 1`;
+                let queryValues = [busId];
+                if (adminRole === 'BUS ADMIN') {
+                    queryText += ' AND bus_services.admin_id = $2';
+                    queryValues.push(adminId);
+                }
+
                 // Get bus_id, bus_name, coach_id, coach_name, total_number_of_buses, number_of_buses from bus_services table and bus_coach_info table
                 const query = {
-                    text: `SELECT bus_services.bus_id, bus_services.bus_name, 
-                    bus_schedule_info.schedule_date, bus_schedule_info.departure_time, bus_schedule_info.arrival_time, 
-                    bus_schedule_info.source, bus_schedule_info.destination, bus_schedule_info.bus_fare, bus_schedule_info.coach_id, 
-                    bus_schedule_info.bus_schedule_id, coach_info.coach_name 
-                    FROM bus_services INNER JOIN bus_schedule_info ON bus_services.bus_id = bus_schedule_info.bus_id 
-                    INNER JOIN coach_info ON bus_schedule_info.coach_id = coach_info.coach_id 
-                    WHERE bus_services.bus_id = $1 
-                    AND bus_schedule_info.schedule_status = 1`,
-                    values: [busId]
+                    text: queryText,
+                    values: queryValues
                 };
                 const result = await pool.query(query);
                 let busInfo = result.rows;
@@ -365,48 +413,7 @@ const singleBusDetails = async (req, res) => {
                 }
                 console.log(layoutInfo);
                 busInfoMap[busId].coach = layoutInfo;
-                // console.log(busInfoMap);
-
-
-                // await pool.query(layoutQuery).then((layoutResult) => {
-                //     let layoutInfo = layoutResult.rows;
-                //     console.log(layoutInfo);
-
-                //     layoutInfo.forEach(async (layout) => {
-
-                //         // Get seat details for each layout
-                //         let seatQuery = {
-                //             text: `SELECT bus_seat_details.seat_name, bus_seat_details.is_seat, bus_seat_details.matrix_row_id, bus_seat_details.matrix_col_id
-                //             FROM bus_seat_details WHERE bus_seat_details.bus_layout_id = $1`,
-                //             values: [layout.bus_layout_id]
-                //         };
-
-                //         await pool.query(seatQuery).then((seatResult) => {
-                //             let seat_details = seatResult.rows;
-                //             let matrix = [];
-                //             for (let i = 0; i < layout.matrix_rows; i++) {
-                //                 matrix.push(new Array(layout.matrix_cols).fill(0));
-                //             }
-                //             seat_details.forEach((seat) => {
-                //                 if (seat.is_seat) {
-                //                     matrix[seat.matrix_row_id][seat.matrix_col_id] = 1;
-                //                 }
-                //             });
-                //             console.log(matrix);
-                //             layout.matrix = matrix;
-                //             console.log(layout);
-                //             // Push the layout info to the busInfoMap
-                //             busInfoMap[busId].coach.push(layout);
-                //         }).catch((error) => {
-                //             console.log(error);
-                //             res.status(500).json({ message: error.message });
-                //         });
-                //     });      
-                //     console.log("After layout info");
-                //     console.log(busInfoMap);
-                // }
-                // )
-                
+                // console.log(busInfoMap);                
                 busInfo = [];
                 for (let busId in busInfoMap) {
                     busInfo.push(busInfoMap[busId]);
@@ -573,7 +580,7 @@ const addBusScheduleInfo = async (req, res) => {
 const getScheduleWiseBusDetails = async (req, res) => {
     // get the token
     // console.log(req)
-    const token = req.body.token;
+    const {token} = req.body;
     // const token = req.headers.authorization?.split(' ')[1];
     if (!token) {
         return res.status(401).json({ message: 'No token provided' });
@@ -589,8 +596,40 @@ const getScheduleWiseBusDetails = async (req, res) => {
         } else {
             try {
                 console.log("getScheduleWiseBusDetails called from bus-service");
+                const {adminId} = req.body;
+                // Check if admin has bus admin role or admin role
+                const checkQuery = {
+                    text: 'SELECT * FROM admin_info WHERE admin_id = $1',
+                    values: [adminId]
+                };
+                const checkResult = await pool.query(checkQuery);
+                if (checkResult.rows.length === 0) {
+                    console.log("Admin does not exist");
+                    return res.status(400).json({ message: 'Admin does not exist' });
+                }
+                const adminRole = checkResult.rows[0].admin_role;
+                if (adminRole !== 'ADMIN' && adminRole !== 'BUS ADMIN') {
+                    console.log("Unauthorized access");
+                    return res.status(401).json({ message: 'Unauthorized access: admin role invalid' });
+                }
+
+                let queryText = `SELECT bus_schedule_info.bus_schedule_id, bus_services.bus_name, 
+                            coach_info.coach_name, bus_schedule_info.source, bus_schedule_info.destination, 
+                            bus_schedule_info.departure_time, bus_schedule_info.arrival_time, 
+                            bus_schedule_info.bus_fare, bus_schedule_info.schedule_date 
+                            FROM bus_schedule_info 
+                            INNER JOIN bus_services ON bus_schedule_info.bus_id = bus_services.bus_id 
+                            INNER JOIN coach_info ON bus_schedule_info.coach_id = coach_info.coach_id 
+                            WHERE bus_schedule_info.schedule_status = 1`;
+                let queryValues = [];
+                if (adminRole === 'BUS ADMIN') {
+                    queryText += ' AND bus_services.admin_id = $1';
+                    queryValues.push(adminId);
+                }
+                queryText += ' ORDER BY bus_schedule_info.schedule_date DESC, bus_schedule_info.departure_time ASC';
                 const query = {
-                    text: 'SELECT bus_schedule_info.bus_schedule_id, bus_services.bus_name, coach_info.coach_name, bus_schedule_info.source, bus_schedule_info.destination, bus_schedule_info.departure_time, bus_schedule_info.arrival_time, bus_schedule_info.bus_fare, bus_schedule_info.schedule_date FROM bus_schedule_info INNER JOIN bus_services ON bus_schedule_info.bus_id = bus_services.bus_id INNER JOIN coach_info ON bus_schedule_info.coach_id = coach_info.coach_id WHERE bus_schedule_info.schedule_status = 1 ORDER BY bus_schedule_info.schedule_date DESC'
+                    text: queryText,
+                    values: queryValues
                 };
                 const result = await pool.query(query);
                 console.log("Schedule wise bus details fetched");
