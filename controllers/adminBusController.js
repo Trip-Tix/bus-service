@@ -232,7 +232,7 @@ const getBusInfo = async (req, res) => {
                 const {adminId} = req.body;
                 // Check if admin has bus admin role or admin role
                 const checkQuery = {
-                    text: 'SELECT * FROM admin_info WHERE admin_id = $1',
+                    text: 'SELECT admin_info.admin_id, admin_role_info.admin_role FROM admin_info INNER JOIN admin_role_info ON admin_info.admin_role_info = admin_role_info.admin_role_id WHERE admin_info.admin_id = $1',
                     values: [adminId]
                 };
                 const checkResult = await accountPool.query(checkQuery);
@@ -322,7 +322,7 @@ const singleBusDetails = async (req, res) => {
                 console.log("singleBusDetails called from bus-service");
                 // Check if admin has bus admin role or admin role
                 const checkQuery = {
-                    text: 'SELECT * FROM admin_info WHERE admin_id = $1',
+                    text: 'SELECT admin_info.admin_id, admin_role_info.admin_role FROM admin_info INNER JOIN admin_role_info ON admin_info.admin_role_info = admin_role_info.admin_role_id WHERE admin_info.admin_id = $1',
                     values: [adminId]
                 };
                 const checkResult = await accountPool.query(checkQuery);
@@ -620,7 +620,7 @@ const getScheduleWiseBusDetails = async (req, res) => {
                 const {adminId} = req.body;
                 // Check if admin has bus admin role or admin role
                 const checkQuery = {
-                    text: 'SELECT * FROM admin_info WHERE admin_id = $1',
+                    text: 'SELECT admin_info.admin_id, admin_role_info.admin_role FROM admin_info INNER JOIN admin_role_info ON admin_info.admin_role_info = admin_role_info.admin_role_id WHERE admin_info.admin_id = $1',
                     values: [adminId]
                 };
                 const checkResult = await accountPool.query(checkQuery);
