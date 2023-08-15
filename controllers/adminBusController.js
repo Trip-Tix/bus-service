@@ -91,7 +91,7 @@ const addBusInfo = async (req, res) => {
                     await pool.query(busCoachQuery);
                 }
                 console.log("Bus Coach added");
-                res.status(200).json({ message: 'Bus information added' });
+                res.status(200).json({ message: 'Bus information added', bus_id: busId });
             } catch (error) {
                 // Rollback transaction
                 await pool.query('ROLLBACK');
@@ -210,7 +210,11 @@ const getBusInfo = async (req, res) => {
                 console.log("getBusInfo called from bus-service");
                 // Get bus_id, bus_name, coach_id, coach_name, total_number_of_buses, number_of_buses from bus_services table and bus_coach_info table
                 const query = {
-                    text: 'SELECT bus_services.bus_id, bus_services.bus_name, bus_coach_info.coach_id, coach_info.coach_name, bus_coach_info.number_of_buses,bus_services.number_of_buses as total_number_of_buses FROM bus_services INNER JOIN bus_coach_info ON bus_services.bus_id = bus_coach_info.bus_id INNER JOIN coach_info ON bus_coach_info.coach_id = coach_info.coach_id'
+                    text: `SELECT bus_services.bus_id, bus_services.bus_name, 
+                    bus_coach_info.coach_id, coach_info.coach_name, 
+                    bus_coach_info.number_of_buses,bus_services.number_of_buses as total_number_of_buses 
+                    FROM bus_services INNER JOIN bus_coach_info ON bus_services.bus_id = bus_coach_info.bus_id 
+                    INNER JOIN coach_info ON bus_coach_info.coach_id = coach_info.coach_id`
                 };
                 const result = await pool.query(query);
                 let busInfo = result.rows;
@@ -245,6 +249,174 @@ const getBusInfo = async (req, res) => {
                 res.status(200).json(busInfo);
             } catch (error) {
                 res.status(500).json({ message: error.message });
+            }
+        }
+    });
+}
+
+// Get bus details, schedule details by bus id
+const singleBusDetails = async (req, res) => {
+    // get the token
+    // console.log(req)
+    const {token, busId} = req.body;
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access");
+            res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        } else {
+            try {
+                console.log("singleBusDetails called from bus-service");
+                // Get bus_id, bus_name, coach_id, coach_name, total_number_of_buses, number_of_buses from bus_services table and bus_coach_info table
+                const query = {
+                    text: `SELECT bus_services.bus_id, bus_services.bus_name, 
+                    bus_schedule_info.schedule_date, bus_schedule_info.departure_time, bus_schedule_info.arrival_time, 
+                    bus_schedule_info.source, bus_schedule_info.destination, bus_schedule_info.bus_fare, bus_schedule_info.coach_id, 
+                    bus_schedule_info.bus_schedule_id, coach_info.coach_name 
+                    FROM bus_services INNER JOIN bus_schedule_info ON bus_services.bus_id = bus_schedule_info.bus_id 
+                    INNER JOIN coach_info ON bus_schedule_info.coach_id = coach_info.coach_id 
+                    WHERE bus_services.bus_id = $1 
+                    AND bus_schedule_info.schedule_status = 1`,
+                    values: [busId]
+                };
+                const result = await pool.query(query);
+                let busInfo = result.rows;
+
+                let busInfoMap = {};
+
+                if (busInfo.length === 0) {
+                    return res.status(200).json([]);
+                }
+                busInfo.forEach((bus) => {
+                    if (busInfoMap[bus.bus_id]) {
+                        busInfoMap[bus.bus_id].schedule.push({
+                            schedule_id : bus.bus_schedule_id,
+                            coach_id: bus.coach_id,
+                            coach_name: bus.coach_name,
+                            schedule_date: bus.schedule_date,
+                            arrival_time: bus.arrival_time,
+                            departure_time: bus.departure_time,
+                            bus_fare: bus.bus_fare,
+                            source: bus.source,
+                            destination: bus.destination
+                        });
+                    } else {
+                        busInfoMap[bus.bus_id] = {
+                            bus_id: bus.bus_id,
+                            bus_name: bus.bus_name,
+                            schedule: [{
+                                schedule_id : bus.bus_schedule_id,
+                                coach_id: bus.coach_id,
+                                coach_name: bus.coach_name,
+                                schedule_date: bus.schedule_date,
+                                arrival_time: bus.arrival_time,
+                                departure_time: bus.departure_time,
+                                bus_fare: bus.bus_fare,
+                                source: bus.source,
+                                destination: bus.destination
+                            }]
+                        };
+                    }
+                });
+                // console.log("Before layout info");
+                // console.log(busInfoMap);
+
+                busInfoMap[busId].coach = [];
+                // //Get bus layout info
+                const layoutQuery = {
+                    text: `SELECT bus_layout_info.bus_id, bus_layout_info.bus_layout_id, bus_layout_info.coach_id, bus_layout_info.number_of_seats, 
+                    bus_layout_info.matrix_rows, bus_layout_info.matrix_cols
+                    FROM bus_layout_info WHERE bus_layout_info.bus_id = $1`,
+                    values: [busId]
+                };
+
+                const layoutResult = await pool.query(layoutQuery);
+                let layoutInfo = layoutResult.rows;
+
+                for (let i = 0; i < layoutInfo.length; i++) {
+                    let layout = layoutInfo[i];
+                    // Get seat details for each layout
+                    let seatQuery = {
+                        text: `SELECT bus_seat_details.seat_name, bus_seat_details.is_seat, bus_seat_details.matrix_row_id, bus_seat_details.matrix_col_id
+                        FROM bus_seat_details WHERE bus_seat_details.bus_layout_id = $1`,
+                        values: [layout.bus_layout_id]
+                    };
+
+                    const seatResult = await pool.query(seatQuery);
+                    let seatDetails = seatResult.rows;
+                    let matrix = [];
+                    for (let i = 0; i < layout.matrix_rows; i++) {
+                        matrix.push(new Array(layout.matrix_cols).fill(0));
+                    }
+                    for (let i = 0; i < seatDetails.length; i++) {
+                        let seat = seatDetails[i];
+                        if (seat.is_seat) {
+                            matrix[seat.matrix_row_id][seat.matrix_col_id] = 1;
+                        }
+                    }
+                    layout.matrix = matrix;
+                }
+                console.log(layoutInfo);
+                busInfoMap[busId].coach = layoutInfo;
+                // console.log(busInfoMap);
+
+
+                // await pool.query(layoutQuery).then((layoutResult) => {
+                //     let layoutInfo = layoutResult.rows;
+                //     console.log(layoutInfo);
+
+                //     layoutInfo.forEach(async (layout) => {
+
+                //         // Get seat details for each layout
+                //         let seatQuery = {
+                //             text: `SELECT bus_seat_details.seat_name, bus_seat_details.is_seat, bus_seat_details.matrix_row_id, bus_seat_details.matrix_col_id
+                //             FROM bus_seat_details WHERE bus_seat_details.bus_layout_id = $1`,
+                //             values: [layout.bus_layout_id]
+                //         };
+
+                //         await pool.query(seatQuery).then((seatResult) => {
+                //             let seat_details = seatResult.rows;
+                //             let matrix = [];
+                //             for (let i = 0; i < layout.matrix_rows; i++) {
+                //                 matrix.push(new Array(layout.matrix_cols).fill(0));
+                //             }
+                //             seat_details.forEach((seat) => {
+                //                 if (seat.is_seat) {
+                //                     matrix[seat.matrix_row_id][seat.matrix_col_id] = 1;
+                //                 }
+                //             });
+                //             console.log(matrix);
+                //             layout.matrix = matrix;
+                //             console.log(layout);
+                //             // Push the layout info to the busInfoMap
+                //             busInfoMap[busId].coach.push(layout);
+                //         }).catch((error) => {
+                //             console.log(error);
+                //             res.status(500).json({ message: error.message });
+                //         });
+                //     });      
+                //     console.log("After layout info");
+                //     console.log(busInfoMap);
+                // }
+                // )
+                
+                busInfo = [];
+                for (let busId in busInfoMap) {
+                    busInfo.push(busInfoMap[busId]);
+                }
+                
+                console.log(busInfo);
+                res.status(200).json(busInfo);
+            } catch(error) {
+                console.log(error);
+                res.status(500).json({ message: error.message })
             }
         }
     });
@@ -487,5 +659,6 @@ module.exports = {
     addBusLayoutInfo,
     addBusScheduleInfo,
     getScheduleWiseBusDetails,
-    removeBusScheduleInfo
+    removeBusScheduleInfo,
+    singleBusDetails
 }
