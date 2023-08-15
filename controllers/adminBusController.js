@@ -24,7 +24,28 @@ pool.connect(err => {
     if (err) {
         console.error('connection error', err.stack);
     } else {
-        console.log('connected to database');
+        console.log('connected to bus database');
+    }
+});
+
+const accountPool = new Pool({
+    host: process.env.PGHOST,
+    port: process.env.PGPORT,
+    user: process.env.PGUSER,
+    password: process.env.PGPASSWORD,
+    database: process.env.PGDATABASEUSER,
+    idleTimeoutMillis: 0,
+    connectionTimeoutMillis: 0,
+    ssl: {
+        rejectUnauthorized: false
+    }
+});
+
+accountPool.connect(err => {
+    if (err) {
+        console.error('connection error', err.stack);
+    } else {
+        console.log('connected to account database');
     }
 });
 
@@ -214,7 +235,7 @@ const getBusInfo = async (req, res) => {
                     text: 'SELECT * FROM admin_info WHERE admin_id = $1',
                     values: [adminId]
                 };
-                const checkResult = await pool.query(checkQuery);
+                const checkResult = await accountPool.query(checkQuery);
                 if (checkResult.rows.length === 0) {
                     console.log("Admin does not exist");
                     return res.status(400).json({ message: 'Admin does not exist' });
@@ -304,7 +325,7 @@ const singleBusDetails = async (req, res) => {
                     text: 'SELECT * FROM admin_info WHERE admin_id = $1',
                     values: [adminId]
                 };
-                const checkResult = await pool.query(checkQuery);
+                const checkResult = await accountPool.query(checkQuery);
                 if (checkResult.rows.length === 0) {
                     console.log("Admin does not exist");
                     return res.status(400).json({ message: 'Admin does not exist' });
@@ -602,7 +623,7 @@ const getScheduleWiseBusDetails = async (req, res) => {
                     text: 'SELECT * FROM admin_info WHERE admin_id = $1',
                     values: [adminId]
                 };
-                const checkResult = await pool.query(checkQuery);
+                const checkResult = await accountPool.query(checkQuery);
                 if (checkResult.rows.length === 0) {
                     console.log("Admin does not exist");
                     return res.status(400).json({ message: 'Admin does not exist' });
