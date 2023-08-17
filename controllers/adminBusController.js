@@ -71,7 +71,7 @@ const addBusInfo = async (req, res) => {
                 await pool.query('BEGIN');
                 console.log("addBusInfo called from bus-service");
                 console.log(req.body);
-                const {busName, totalNumberOfBuses, adminId, coachInfo} = req.body;
+                const {busName, totalNumberOfBuses, adminUsername, coachInfo} = req.body;
                 // Check if bus name already exists
                 const checkQuery = {
                     text: 'SELECT * FROM bus_services WHERE bus_name = $1',
@@ -82,6 +82,19 @@ const addBusInfo = async (req, res) => {
                     console.log("Bus name already exists");
                     return res.status(400).json({ message: 'Bus name already exists' });
                 }
+
+                // Get admin id
+                const adminIdQuery = {
+                    text: 'SELECT admin_id FROM admin_info WHERE username = $1',
+                    values: [adminUsername]
+                };
+                const adminIdResult = await accountPool.query(adminIdQuery);
+                if (adminIdResult.rows.length === 0) {
+                    console.log("Admin does not exist");
+                    return res.status(400).json({ message: 'Admin does not exist' });
+                }
+                const adminId = adminIdResult.rows[0].admin_id;
+
 
                 // Get the coach id array from coachInfo array of objects
                 const coachIdArray = coachInfo.map(coach => coach.coachId);
@@ -229,11 +242,11 @@ const getBusInfo = async (req, res) => {
         } else {
             try {
                 console.log("getBusInfo called from bus-service");
-                const {adminId} = req.body;
+                const {adminUsername} = req.body;
                 // Check if admin has bus admin role or admin role
                 const checkQuery = {
-                    text: 'SELECT admin_info.admin_id, admin_role_info.admin_role FROM admin_info INNER JOIN admin_role_info ON admin_info.admin_role_info = admin_role_info.admin_role_id WHERE admin_info.admin_id = $1',
-                    values: [adminId]
+                    text: 'SELECT admin_info.admin_id, admin_role_info.admin_role FROM admin_info INNER JOIN admin_role_info ON admin_info.admin_role_info = admin_role_info.admin_role_id WHERE admin_info.username = $1',
+                    values: [adminUsername]
                 };
                 const checkResult = await accountPool.query(checkQuery);
                 if (checkResult.rows.length === 0) {
@@ -241,6 +254,7 @@ const getBusInfo = async (req, res) => {
                     return res.status(400).json({ message: 'Admin does not exist' });
                 }
                 const adminRole = checkResult.rows[0].admin_role;
+                const adminId = checkResult.rows[0].admin_id;
                 if (adminRole !== 'ADMIN' && adminRole !== 'BUS ADMIN') {
                     console.log("Unauthorized access");
                     return res.status(401).json({ message: 'Unauthorized access: admin role invalid' });
@@ -304,7 +318,7 @@ const getBusInfo = async (req, res) => {
 const singleBusDetails = async (req, res) => {
     // get the token
     // console.log(req)
-    const {token, busId, adminId} = req.body;
+    const {token, busId, adminUsername} = req.body;
     if (!token) {
         return res.status(401).json({ message: 'No token provided' });
     }
@@ -322,8 +336,8 @@ const singleBusDetails = async (req, res) => {
                 console.log("singleBusDetails called from bus-service");
                 // Check if admin has bus admin role or admin role
                 const checkQuery = {
-                    text: 'SELECT admin_info.admin_id, admin_role_info.admin_role FROM admin_info INNER JOIN admin_role_info ON admin_info.admin_role_info = admin_role_info.admin_role_id WHERE admin_info.admin_id = $1',
-                    values: [adminId]
+                    text: 'SELECT admin_info.admin_id, admin_role_info.admin_role FROM admin_info INNER JOIN admin_role_info ON admin_info.admin_role_info = admin_role_info.admin_role_id WHERE admin_info.username = $1',
+                    values: [adminUsername]
                 };
                 const checkResult = await accountPool.query(checkQuery);
                 if (checkResult.rows.length === 0) {
@@ -331,6 +345,7 @@ const singleBusDetails = async (req, res) => {
                     return res.status(400).json({ message: 'Admin does not exist' });
                 }
                 const adminRole = checkResult.rows[0].admin_role;
+                const adminId = checkResult.rows[0].admin_id;
                 if (adminRole !== 'ADMIN' && adminRole !== 'BUS ADMIN') {
                     console.log("Unauthorized access");
                     return res.status(401).json({ message: 'Unauthorized access: admin role invalid' });
@@ -617,11 +632,11 @@ const getScheduleWiseBusDetails = async (req, res) => {
         } else {
             try {
                 console.log("getScheduleWiseBusDetails called from bus-service");
-                const {adminId} = req.body;
+                const {adminUsername} = req.body;
                 // Check if admin has bus admin role or admin role
                 const checkQuery = {
-                    text: 'SELECT admin_info.admin_id, admin_role_info.admin_role FROM admin_info INNER JOIN admin_role_info ON admin_info.admin_role_info = admin_role_info.admin_role_id WHERE admin_info.admin_id = $1',
-                    values: [adminId]
+                    text: 'SELECT admin_info.admin_id, admin_role_info.admin_role FROM admin_info INNER JOIN admin_role_info ON admin_info.admin_role_info = admin_role_info.admin_role_id WHERE admin_info.username = $1',
+                    values: [adminUsername]
                 };
                 const checkResult = await accountPool.query(checkQuery);
                 if (checkResult.rows.length === 0) {
@@ -629,6 +644,7 @@ const getScheduleWiseBusDetails = async (req, res) => {
                     return res.status(400).json({ message: 'Admin does not exist' });
                 }
                 const adminRole = checkResult.rows[0].admin_role;
+                const adminId = checkResult.rows[0].admin_id;
                 if (adminRole !== 'ADMIN' && adminRole !== 'BUS ADMIN') {
                     console.log("Unauthorized access");
                     return res.status(401).json({ message: 'Unauthorized access: admin role invalid' });
