@@ -1,59 +1,17 @@
-const { Pool } = require('pg');
 const dotenv = require('dotenv');
 const jwt = require('jsonwebtoken');
+const { busPool } = require('../config/busDB.js');
+const { accountPool } = require('../config/accountDB.js');
 
 dotenv.config();
 
 const secretKey = process.env.SECRETKEY;
 
-// Connect to Postgres
-const pool = new Pool({
-    host: process.env.PGHOST,
-    port: process.env.PGPORT,
-    user: process.env.PGUSER,
-    password: process.env.PGPASSWORD,
-    database: process.env.PGDATABASE,
-    idleTimeoutMillis: 0,
-    connectionTimeoutMillis: 0,
-    ssl: {
-        rejectUnauthorized: false
-    }
-});
-
-pool.connect(err => {
-    if (err) {
-        console.error('connection error', err.stack);
-    } else {
-        console.log('connected to bus database');
-    }
-});
-
-const accountPool = new Pool({
-    host: process.env.PGHOST,
-    port: process.env.PGPORT,
-    user: process.env.PGUSER,
-    password: process.env.PGPASSWORD,
-    database: process.env.PGDATABASEUSER,
-    idleTimeoutMillis: 0,
-    connectionTimeoutMillis: 0,
-    ssl: {
-        rejectUnauthorized: false
-    }
-});
-
-accountPool.connect(err => {
-    if (err) {
-        console.error('connection error', err.stack);
-    } else {
-        console.log('connected to account database');
-    }
-});
-
 // Add bus info with bus name, number of buses and coach info
 const addBusInfo = async (req, res) => {
     // get the token
     // console.log(req)
-    const {token} = req.body;
+    const { token } = req.body;
     if (!token) {
         return res.status(401).json({ message: 'No token provided' });
     }
@@ -68,7 +26,7 @@ const addBusInfo = async (req, res) => {
         } else {
             try {
                 // Begin transaction
-                await pool.query('BEGIN');
+                await busPool.query('BEGIN');
                 console.log("addBusInfo called from bus-service");
                 console.log(req.body);
                 const {busName, totalNumberOfBuses, adminUsername, coachInfo} = req.body;
@@ -77,7 +35,7 @@ const addBusInfo = async (req, res) => {
                     text: 'SELECT * FROM bus_services WHERE bus_name = $1',
                     values: [busName]
                 };
-                const checkResult = await pool.query(checkQuery);
+                const checkResult = await busPool.query(checkQuery);
                 if (checkResult.rows.length > 0) {
                     console.log("Bus name already exists");
                     return res.status(400).json({ message: 'Bus name already exists' });
@@ -102,7 +60,7 @@ const addBusInfo = async (req, res) => {
                     text: 'INSERT INTO bus_services (bus_name, number_of_buses, admin_id, coaches_info) VALUES ($1, $2, $3, $4)',
                     values: [busName, totalNumberOfBuses, adminId, coachIdArray]
                 };
-                const result = await pool.query(query);
+                const result = await busPool.query(query);
                 console.log("Bus added");
                 console.log(result);
 
@@ -112,7 +70,7 @@ const addBusInfo = async (req, res) => {
                     text: 'SELECT bus_id FROM bus_services WHERE bus_name = $1',
                     values: [busName]
                 };
-                const busIdResult = await pool.query(busIdQuery);
+                const busIdResult = await busPool.query(busIdQuery);
                 const busId = busIdResult.rows[0].bus_id;
                 console.log("Bus id", busId);
                 for (let i = 0; i < coachInfo.length; i++) {
@@ -122,18 +80,18 @@ const addBusInfo = async (req, res) => {
                         text: 'INSERT INTO bus_coach_info (bus_id, coach_id, number_of_buses) VALUES ($1, $2, $3)',
                         values: [busId, coachId, numberOfBuses]
                     };
-                    await pool.query(busCoachQuery);
+                    await busPool.query(busCoachQuery);
                 }
                 console.log("Bus Coach added");
                 res.status(200).json({ message: 'Bus information added', bus_id: busId });
             } catch (error) {
                 // Rollback transaction
-                await pool.query('ROLLBACK');
+                await busPool.query('ROLLBACK');
                 console.log(error);
                 res.status(500).json({ message: error.message });
             } finally {
                 // End transaction
-                await pool.query('COMMIT');
+                await busPool.query('COMMIT');
             }
         }
     });
@@ -170,7 +128,7 @@ const addCoachInfo = async (req, res) => {
                     text: 'SELECT * FROM coach_info WHERE coach_name = $1',
                     values: [coachName]
                 };
-                const checkResult = await pool.query(checkQuery);
+                const checkResult = await busPool.query(checkQuery);
                 if (checkResult.rows.length > 0) {
                     console.log("Coach name already exists");
                     return res.status(400).json({ message: 'Coach name already exists' });
@@ -179,7 +137,7 @@ const addCoachInfo = async (req, res) => {
                     text: 'INSERT INTO coach_info (coach_name) VALUES ($1)',
                     values: [coachName]
                 };
-                await pool.query(query);
+                await busPool.query(query);
                 console.log("Coach added");
                 res.status(200).json({ message: 'Bus Coach added' });
             } catch (error) {
@@ -212,7 +170,7 @@ const getCoachInfo = async (req, res) => {
                 const query = {
                     text: 'SELECT * FROM coach_info'
                 };
-                const result = await pool.query(query);
+                const result = await busPool.query(query);
                 const coachInfo = result.rows;
                 console.log(coachInfo);
                 res.status(200).json(coachInfo);
@@ -276,7 +234,7 @@ const getBusInfo = async (req, res) => {
                     values: queryValues
                 };
                 
-                const result = await pool.query(query);
+                const result = await busPool.query(query);
                 let busInfo = result.rows;
 
                 let busInfoMap = {};
@@ -370,7 +328,7 @@ const singleBusDetails = async (req, res) => {
                     text: queryText,
                     values: queryValues
                 };
-                const result = await pool.query(query);
+                const result = await busPool.query(query);
                 let busInfo = result.rows;
 
                 let busInfoMap = {};
@@ -421,7 +379,7 @@ const singleBusDetails = async (req, res) => {
                     values: [busId]
                 };
 
-                const layoutResult = await pool.query(layoutQuery);
+                const layoutResult = await busPool.query(layoutQuery);
                 let layoutInfo = layoutResult.rows;
 
                 for (let i = 0; i < layoutInfo.length; i++) {
@@ -433,7 +391,7 @@ const singleBusDetails = async (req, res) => {
                         values: [layout.bus_layout_id]
                     };
 
-                    const seatResult = await pool.query(seatQuery);
+                    const seatResult = await busPool.query(seatQuery);
                     let seatDetails = seatResult.rows;
                     let matrix = [];
                     for (let i = 0; i < layout.matrix_rows; i++) {
@@ -469,7 +427,7 @@ const singleBusDetails = async (req, res) => {
 const addBusLayoutInfo = async (req, res) => {
     try {
         // Begin transaction
-        await pool.query('BEGIN');
+        await busPool.query('BEGIN');
         console.log("addBusLayoutInfo called from bus-service");
         console.log(req.body);
         const {busId, coachId, numberOfSeats, matrix, matrixRows, matrixCols} = req.body;
@@ -479,7 +437,7 @@ const addBusLayoutInfo = async (req, res) => {
             text: 'SELECT * FROM bus_layout_info WHERE bus_id = $1 AND coach_id = $2',
             values: [busId, coachId]
         };
-        const checkResult = await pool.query(checkQuery);
+        const checkResult = await busPool.query(checkQuery);
         if (checkResult.rows.length > 0) {
             console.log("Bus layout already exists");
             return res.status(400).json({ message: 'Bus layout already exists' });
@@ -490,7 +448,7 @@ const addBusLayoutInfo = async (req, res) => {
             text: 'INSERT INTO bus_layout_info (bus_id, coach_id, number_of_seats, matrix_rows, matrix_cols) VALUES ($1, $2, $3, $4, $5)',
             values: [busId, coachId, numberOfSeats, matrixRows, matrixCols]
         };
-        await pool.query(query);
+        await busPool.query(query);
         console.log("Bus layout added");
 
         // Get the bus layout id
@@ -498,7 +456,7 @@ const addBusLayoutInfo = async (req, res) => {
             text: 'SELECT * FROM bus_layout_info WHERE bus_id = $1 AND coach_id = $2',
             values: [busId, coachId]
         };
-        const getResult = await pool.query(getQuery);
+        const getResult = await busPool.query(getQuery);
         const busLayoutId = getResult.rows[0].bus_layout_id;
 
         // Add layout details
@@ -514,7 +472,7 @@ const addBusLayoutInfo = async (req, res) => {
                     text: 'INSERT INTO bus_seat_details (bus_layout_id, seat_name, is_seat, matrix_row_id, matrix_col_id) VALUES ($1, $2, $3, $4, $5)',
                     values: [busLayoutId, seat_name, matrix[i][j], i, j]
                 };
-                await pool.query(query);
+                await busPool.query(query);
             }
         }
 
@@ -523,11 +481,11 @@ const addBusLayoutInfo = async (req, res) => {
     } catch (error) {
         console.log(error);
         // Rollback transaction
-        await pool.query('ROLLBACK');
+        await busPool.query('ROLLBACK');
         res.status(500).json({ message: error.message });
     } finally {
         // End transaction
-        await pool.query('COMMIT');
+        await busPool.query('COMMIT');
     }
 }
 
@@ -535,7 +493,7 @@ const addBusLayoutInfo = async (req, res) => {
 const addBusScheduleInfo = async (req, res) => {
     try {
         // Begin transaction
-        await pool.query('BEGIN');
+        await busPool.query('BEGIN');
         console.log("addBusScheduleInfo called from bus-service");
 
         const {schedule, busId} = req.body;
@@ -548,12 +506,12 @@ const addBusScheduleInfo = async (req, res) => {
                     text: 'SELECT * FROM bus_schedule_info WHERE bus_id = $1 AND source = $2 AND destination = $3 AND departure_time = $4 AND coach_id = $5 AND schedule_date = $6',
                     values: [busId, source, destination, departureTime, coachId, date]
                 };
-                const checkResult = await pool.query(checkQuery);
+                const checkResult = await busPool.query(checkQuery);
                 if (checkResult.rows.length > 0) {
                     console.log("Bus schedule already exists");
 
                     // Rollback transaction
-                    await pool.query('ROLLBACK');
+                    await busPool.query('ROLLBACK');
                     return res.status(400).json({ message: 'Bus schedule already exists' });
                 }
                 
@@ -562,11 +520,11 @@ const addBusScheduleInfo = async (req, res) => {
                     text: 'SELECT * FROM bus_layout_info WHERE bus_id = $1 AND coach_id = $2',
                     values: [busId, coachId]
                 };
-                const checkResult2 = await pool.query(checkQuery2);
+                const checkResult2 = await busPool.query(checkQuery2);
                 if (checkResult2.rows.length === 0) {
                     console.log("Bus layout does not exist");
                     // Rollback transaction
-                    await pool.query('ROLLBACK');
+                    await busPool.query('ROLLBACK');
                     return res.status(400).json({ message: 'Bus layout does not exist' });
                 }
 
@@ -578,7 +536,7 @@ const addBusScheduleInfo = async (req, res) => {
                     text: 'INSERT INTO bus_schedule_info (bus_id, source, destination, departure_time, arrival_time, bus_fare, coach_id, schedule_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
                     values: [busId, source, destination, departureTime, arrivingTime, fare, coachId, date]
                 };
-                await pool.query(query);
+                await busPool.query(query);
                 console.log("Bus schedule added");
 
                 // Get the bus schedule id
@@ -586,7 +544,7 @@ const addBusScheduleInfo = async (req, res) => {
                     text: 'SELECT * FROM bus_schedule_info WHERE bus_id = $1 AND source = $2 AND destination = $3 AND departure_time = $4 AND coach_id = $5 AND schedule_date = $6',
                     values: [busId, source, destination, departureTime, coachId, date]
                 };
-                const getResult = await pool.query(getQuery);
+                const getResult = await busPool.query(getQuery);
                 const busScheduleId = getResult.rows[0].bus_schedule_id;
 
                 // Insert into bus schedule seat info table with bus schedule id and bus layout id and the seat details selecting from seat details table with bus layout id
@@ -594,7 +552,7 @@ const addBusScheduleInfo = async (req, res) => {
                     text: 'INSERT INTO bus_schedule_seat_info (bus_schedule_id, bus_layout_id, bus_seat_id) SELECT $1, $2, bus_seat_id FROM bus_seat_details WHERE bus_layout_id = $3 and is_seat = 1',
                     values: [busScheduleId, busLayoutId, busLayoutId]
                 };
-                await pool.query(insertQuery);
+                await busPool.query(insertQuery);
                 console.log("Bus schedule seat info added");
             }
         }
@@ -604,11 +562,11 @@ const addBusScheduleInfo = async (req, res) => {
     } catch (error) {
         console.log(error);
         // Rollback transaction
-        await pool.query('ROLLBACK');
+        await busPool.query('ROLLBACK');
         res.status(500).json({ message: error.message });
     } finally {
         // End transaction
-        await pool.query('COMMIT');
+        await busPool.query('COMMIT');
     }
 }
 
@@ -668,7 +626,7 @@ const getScheduleWiseBusDetails = async (req, res) => {
                     text: queryText,
                     values: queryValues
                 };
-                const result = await pool.query(query);
+                const result = await busPool.query(query);
                 console.log("Schedule wise bus details fetched");
                 res.status(200).json(result.rows);
             } catch (error) {
@@ -705,7 +663,7 @@ const removeBusScheduleInfo = async (req, res) => {
                     text: 'SELECT * FROM bus_schedule_info WHERE bus_schedule_id = $1',
                     values: [busScheduleId]
                 };
-                const checkResult = await pool.query(checkQuery);
+                const checkResult = await busPool.query(checkQuery);
                 if (checkResult.rows.length === 0) {
                     return res.status(400).json({ message: 'Bus schedule does not exist' });
                 }
@@ -715,7 +673,7 @@ const removeBusScheduleInfo = async (req, res) => {
                     text: 'UPDATE bus_schedule_info SET schedule_status = 0 WHERE bus_schedule_id = $1',
                     values: [busScheduleId]
                 };
-                await pool.query(query);
+                await busPool.query(query);
                 console.log("Bus schedule info removed");
                 res.status(200).json({ message: 'Bus schedule info removed' });
             } catch (error) {
