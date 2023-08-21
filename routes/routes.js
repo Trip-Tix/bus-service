@@ -14,16 +14,16 @@ router.post('/api/admin/addCoachInfo', bodyParser, adminBusController.addCoachIn
 router.post('/api/admin/getCoachInfo', bodyParser, adminBusController.getCoachInfo);
 
 // Get bus info from admin
-router.post('/api/admin/getBusNames', adminBusController.getBusNames);
+router.post('/api/admin/getBusNames', bodyParser, adminBusController.getBusNames);
 
 // Get all bus
-router.post('/api/admin/getAllBus', adminBusController.getAllBus);
+router.post('/api/admin/getAllBus', bodyParser, adminBusController.getAllBus);
 
 // Add bus schedule info from admin
 router.post('/api/admin/addBusScheduleInfo', bodyParser, adminBusController.addBusScheduleInfo);
 
 // Get bus schedule info from admin
-router.post('/api/admin/getScheduleWiseBusDetails', adminBusController.getScheduleWiseBusDetails);
+router.post('/api/admin/getScheduleWiseBusDetails', bodyParser, adminBusController.getScheduleWiseBusDetails);
 
 // Remove bus schedule info from admin
 router.post('/api/admin/removeBusScheduleInfo', bodyParser, adminBusController.removeBusScheduleInfo);
