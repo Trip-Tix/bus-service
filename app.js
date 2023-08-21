@@ -17,7 +17,7 @@ app.get('/', (req, res) => {
     res.send('Bus service is up and running');
 });
 
-startAdminCreationConsumer();
+// startAdminCreationConsumer();
 
 app.listen(port, () => {
     console.log(`Bus service listening on port ${port}`);
