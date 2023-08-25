@@ -363,7 +363,7 @@ const getBrandInfo = async (req, res) => {
                     values: [busCompanyName]
                 };
                 const busIdResult = await busPool.query(busIdQuery);
-                const busId = busIdResult.rows[0].busId;
+                const busId = busIdResult.rows[0].bus_id;
                 console.log("Bus id", busId);
 
                 // Get the coach info and brand info from bus coach info table
@@ -379,10 +379,12 @@ const getBrandInfo = async (req, res) => {
                 const brandInfo = result.rows;
                 let brandInfoList = [];
 
+                console.log(brandInfo)
+
                 let coachInfo = {};
                 brandInfo.forEach((brand) => {
                     if (coachInfo[brand.coach_id]) {
-                        coachInfo['brandList'].push(brand.brand_name);
+                        coachInfo[brand.coach_id].brandList.push(brand.brand_name);
                     } else {
                         coachInfo[brand.coach_id] = {
                             coachName: brand.coach_name,
@@ -390,14 +392,12 @@ const getBrandInfo = async (req, res) => {
                         };
                     }
                 });
-                for (let coachName in coachInfo) {
-                    brandInfoList.push({
-                        coachName: coachName,
-                        brandName: coachInfo[coachName]
-                    });
+                console.log(coachInfo);
+                for (let coachId in coachInfo) {
+                    let brandInfo = coachInfo[coachId];
+                    brandInfo.coachId = coachId;
+                    brandInfoList.push(brandInfo);
                 }
-                console.log(brandInfoList);
-                console.log(brandInfo);
                 res.status(200).json(brandInfoList);
             } catch (error) {
                 console.log(error);
