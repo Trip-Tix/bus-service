@@ -459,7 +459,7 @@ const getBusLayout = async (req, res) => {
                 const busCoachId = busCoachIdResult.rows[0].bus_coach_id;
                 console.log("Bus Coach Id", busCoachId);
 
-                let queryText = `SELECT bus_coach_info.bus_id, bus_coach_info.bus_coach_id, bus_coach_info.coach_name, bus_coach_info.number_of_bus, brand_name_info.brand_name,  
+                let queryText = `SELECT bus_coach_info.bus_id, bus_coach_info.bus_coach_id, bus_coach_info.number_of_bus, brand_name_info.brand_name,  
                                 bus_layout_info.bus_layout_id, bus_layout_info.number_of_seats, 
                                 bus_layout_info.row, bus_layout_info.col 
                                 FROM bus_coach_info 
@@ -479,27 +479,27 @@ const getBusLayout = async (req, res) => {
                 }
 
                 for (let i = 0; i < busInfo.length; i++) {
-                    let layout = busInfo[i];
+                    let layoutInfo = busInfo[i];
                     // Get seat details for each layout
                     let seatQuery = {
                         text: `SELECT bus_seat_details.seat_name, bus_seat_details.is_seat, bus_seat_details.row_id, bus_seat_details.col_id
                         FROM bus_seat_details WHERE bus_seat_details.bus_layout_id = $1`,
-                        values: [layout.busLayoutId]
+                        values: [layoutInfo.busLayoutId]
                     };
 
                     const seatResult = await busPool.query(seatQuery);
                     let seatDetails = seatResult.rows;
-                    let matrix = [];
-                    for (let i = 0; i < layout.row; i++) {
-                        matrix.push(new Array(layout.col).fill(0));
+                    let layout = [];
+                    for (let i = 0; i < layoutInfo.row; i++) {
+                        layout.push(new Array(layoutInfo.col).fill(0));
                     }
                     for (let i = 0; i < seatDetails.length; i++) {
                         let seat = seatDetails[i];
                         if (seat.isSeat) {
-                            matrix[seat.rowId][seat.colId] = 1;
+                            layout[seat.rowId][seat.colId] = 1;
                         }
                     }
-                    layout.matrix = matrix;
+                    layoutInfo.layout = layout;
                 }
                 console.log(busInfo[0]);                
                 res.status(200).json(busInfo[0]);
