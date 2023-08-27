@@ -691,6 +691,134 @@ const getLocation = async (req, res) => {
     });
 }
 
+// Get available bus
+const getAvailableBus = async (req, res) => {
+    // get the token
+    // console.log(req)
+    const {token, busCompanyName, coachId, brandName, date} = req.body;
+    if (!token) {
+        console.log("No token provided");
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access: token invalid");
+            res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        } else {
+            try {
+                console.log("getAvailableBus called from bus-service");
+                console.log(req.body);
+                
+                // Get the bus id from bus company name
+                const busIdQuery = {
+                    text: 'SELECT bus_id FROM bus_services WHERE bus_company_name = $1',
+                    values: [busCompanyName]
+                };
+                const busIdResult = await busPool.query(busIdQuery);
+                const busId = busIdResult.rows[0].bus_id;
+                console.log("Bus id", busId);
+
+                // Get the brand id from brand name
+                const brandIdQuery = {
+                    text: 'SELECT brand_name_id FROM brand_name_info WHERE brand_name = $1',
+                    values: [brandName]
+                };
+                const brandNameIdResult = await busPool.query(brandIdQuery);
+                const brandNameId = brandNameIdResult.rows[0].brand_name_id;
+                console.log("Brand id", brandNameId);
+
+                // Get the bus coach id from bus coach info table
+                const busCoachIdQuery = {
+                    text: 'SELECT bus_coach_id FROM bus_coach_info WHERE bus_id = $1 AND coach_id = $2 AND brand_name_id = $3',
+                    values: [busId, coachId, brandNameId]
+                };
+                const busCoachIdResult = await busPool.query(busCoachIdQuery);
+                if (busCoachIdResult.rows.length === 0) {
+                    return res.status(200).json([]);
+                }
+                const busCoachId = busCoachIdResult.rows[0].bus_coach_id;
+                console.log("Bus Coach Id", busCoachId);
+
+                // Get the bus layout id from bus layout info table
+                const busLayoutIdQuery = {
+                    text: 'SELECT bus_layout_id, number_of_seats, row, col FROM bus_layout_info WHERE bus_id = $1 AND bus_coach_id = $2',
+                    values: [busId, busCoachId]
+                };
+                const busLayoutIdResult = await busPool.query(busLayoutIdQuery);
+                const busLayoutId = busLayoutIdResult.rows[0].bus_layout_id;
+                const numberOfSeats = busLayoutIdResult.rows[0].number_of_seats;
+                const row = busLayoutIdResult.rows[0].row;
+                const col = busLayoutIdResult.rows[0].col;
+                console.log("Bus Layout Id", busLayoutId);
+
+                // Get the bus seat details from bus seat details table
+                const busSeatDetailsQuery = {
+                    text: 'SELECT seat_name, is_seat, row_id, col_id FROM bus_seat_details WHERE bus_layout_id = $1',
+                    values: [busLayoutId]
+                };
+                const busSeatDetailsResult = await busPool.query(busSeatDetailsQuery);
+                const busSeatDetails = busSeatDetailsResult.rows;
+                
+                let layout = [];
+                for (let i = 0; i < row; i++) {
+                    layout.push(new Array(col).fill(0));
+                }
+                for (let i = 0; i < busSeatDetails.length; i++) {
+                    let seat = busSeatDetails[i];
+                    if (seat.is_seat) {
+                        layout[seat.row_id][seat.col_id] = 1;
+                    }
+                }
+                console.log(layout);
+
+                const dateParts = date.split('-');
+                const isoDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`; // yyyy-mm-dd
+
+                // Get the unique bus id list from schedule info table whose schedule status is 1
+                const scheduleInfoQuery = {
+                    text: 'SELECT unique_bus_id FROM bus_schedule_info WHERE bus_id = $1 AND schedule_status = $2 AND schedule_date = $3',
+                    values: [busId, 1, isoDate]
+                };
+                const scheduleInfoResult = await busPool.query(scheduleInfoQuery);
+                const uniqueBusIdList = scheduleInfoResult.rows;
+                
+                // Get the unique bus id array from unique bus id list
+                let uniqueBusIdArray = [];
+                for (let i = 0; i < uniqueBusIdList.length; i++) {
+                    uniqueBusIdArray.push(uniqueBusIdList[i].unique_bus_id);
+                }
+
+                // Get the unique bus id list from bus coach details table whose unique bus id is not in unique bus id array
+                const busCoachDetailsQuery = {
+                    text: 'SELECT unique_bus_id FROM bus_coach_details WHERE bus_id = $1 AND coach_id = $2 AND brand_name_id = $3 AND unique_bus_id NOT IN ($4)',
+                    values: [busId, coachId, brandNameId, uniqueBusIdArray]
+                };
+                const busCoachDetailsResult = await busPool.query(busCoachDetailsQuery);
+                const uniqueBusId = busCoachDetailsResult.rows;
+                console.log(uniqueBusId);
+
+                let result = {}
+                result.uniqueBusId = uniqueBusId;
+                result.layout = layout;
+                result.numberOfSeats = numberOfSeats;
+                console.log(result);
+                res.status(200).json(result);
+            } catch (error) {
+                console.log(error);
+                res.status(500).json({ message: error.message });
+            }
+        }
+    });
+}
+
+
+                
+
 //Get all bus
 const getAllBus = async (req, res) => {
     // get the token
@@ -1144,4 +1272,5 @@ module.exports = {
     getBusInfo,
     getAllUniqueBus,
     getLocation,
+    getAvailableBus,
 }
