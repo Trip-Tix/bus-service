@@ -34,14 +34,14 @@ router.post('/api/admin/getLocation', bodyParser, adminBusController.getLocation
 // Get available bus list from admin
 router.post('/api/admin/getAvailableBus', bodyParser, adminBusController.getAvailableBus);
 
+// Add bus schedule info from admin
+router.post('/api/admin/addBusScheduleInfo', bodyParser, adminBusController.addBusScheduleInfo);
+
 // // Get bus info from admin
 // router.post('/api/admin/getBusNames', bodyParser, adminBusController.getBusNames);
 
 // // Get all bus
 // router.post('/api/admin/getAllBus', bodyParser, adminBusController.getAllBus);
-
-// // Add bus schedule info from admin
-// router.post('/api/admin/addBusScheduleInfo', bodyParser, adminBusController.addBusScheduleInfo);
 
 // // Get bus schedule info from admin
 // router.post('/api/admin/getScheduleWiseBusDetails', bodyParser, adminBusController.getScheduleWiseBusDetails);

@@ -816,6 +816,125 @@ const getAvailableBus = async (req, res) => {
     });
 }
 
+// Add bus schedule info with bus id, source, destination, departure time, arrival time, fare and date
+const addBusScheduleInfo = async (req, res) => {
+    // get the token
+    // console.log(req)
+    const {token, busCompanyName, src, dest, destPoints, date, schedule} = req.body;
+
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access: token invalid");
+            res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        } else {
+            try {
+                // Begin transaction
+                await busPool.query('BEGIN');
+                console.log("addBusScheduleInfo called from bus-service");
+                console.log(req.body);
+
+                // Get the bus id from bus company name
+                const busIdQuery = {
+                    text: 'SELECT bus_id FROM bus_services WHERE bus_company_name = $1',
+                    values: [busCompanyName]
+                };
+                const busIdResult = await busPool.query(busIdQuery);
+                const busId = busIdResult.rows[0].bus_id;
+                console.log("Bus id", busId);
+
+                for (let i = 0; i < schedule.length; i++) {
+                    let scheduleInfo = schedule[i];
+                    const { time, uniqueBusId, fare } = scheduleInfo;
+
+                    const dateParts = date.split('-');
+                    const isoDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`; // yyyy-mm-dd
+
+                    // Add bus schedule info to bus schedule info table
+                    const busScheduleInfoQuery = {
+                        text: 'INSERT INTO bus_schedule_info (bus_id, unique_bus_id, starting_point, ending_point, destination_points, departure_time, bus_fare, schedule_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+                        values: [busId, uniqueBusId, src, dest, destPoints, time, fare, isoDate]
+                    };
+                    await busPool.query(busScheduleInfoQuery);
+                    console.log("Bus schedule info added");
+
+                    // Get the bus schedule id from bus schedule info table
+                    const busScheduleIdQuery = {
+                        text: 'SELECT bus_schedule_id FROM bus_schedule_info WHERE bus_id = $1 AND unique_bus_id = $2 AND starting_point = $3 AND ending_point = $4 AND departure_time = $5 AND schedule_date = $6 ORDER BY bus_schedule_id DESC LIMIT 1',
+                        values: [busId, uniqueBusId, src, dest, time, isoDate]
+                    };
+                    const busScheduleIdResult = await busPool.query(busScheduleIdQuery);
+                    const busScheduleId = busScheduleIdResult.rows[0].bus_schedule_id;
+                    console.log("Bus schedule id", busScheduleId);
+
+                    // Get the bus coach id from bus coach details table
+                    const busCoachIdQuery = {
+                        text: `SELECT bus_coach_info.bus_coach_id, bus_coach_details.unique_bus_id  
+                            FROM bus_coach_info 
+                            INNER JOIN bus_coach_details ON bus_coach_info.bus_id = bus_coach_details.bus_id 
+                            AND bus_coach_info.coach_id = bus_coach_details.coach_id
+                            AND bus_coach_info.brand_name_id = bus_coach_details.brand_name_id
+                            WHERE bus_coach_details.unique_bus_id = $1`,
+                        values: [uniqueBusId]
+                    };
+                    const busCoachIdResult = await busPool.query(busCoachIdQuery);
+                    const busCoachId = busCoachIdResult.rows[0].bus_coach_id;
+                    console.log("Bus coach id", busCoachId);
+
+                    // Get the bus layout id from bus layout info table
+                    const busLayoutIdQuery = {
+                        text: 'SELECT bus_layout_id FROM bus_layout_info WHERE bus_coach_id = $1',
+                        values: [busCoachId]
+                    };
+                    const busLayoutIdResult = await busPool.query(busLayoutIdQuery);
+                    const busLayoutId = busLayoutIdResult.rows[0].bus_layout_id;
+                    console.log("Bus layout id", busLayoutId);
+
+                    // Get the bus seat details from bus seat details table
+                    const busSeatDetailsQuery = {
+                        text: 'SELECT bus_seat_id, is_seat FROM bus_seat_details WHERE bus_layout_id = $1',
+                        values: [busLayoutId]
+                    };
+                    const busSeatDetailsResult = await busPool.query(busSeatDetailsQuery);
+                    const busSeatDetails = busSeatDetailsResult.rows;
+
+                    // Add bus seat details to bus schedule seat details table
+                    for (let j = 0; j < busSeatDetails.length; j++) {
+                        let seat = busSeatDetails[j];
+                        if (seat.is_seat) {
+                            const busScheduleSeatDetailsQuery = {
+                                text: 'INSERT INTO bus_schedule_seat_info (bus_schedule_id, bus_layout_id, bus_seat_id) VALUES ($1, $2, $3)',
+                                values: [busScheduleId, busLayoutId, seat.bus_seat_id]
+                            };
+                            await busPool.query(busScheduleSeatDetailsQuery);
+                        }
+                    }
+                    console.log("Bus schedule seat details added");
+                }
+                console.log("Bus schedule details added");
+                res.status(200).json({ message: 'Bus schedule details added' });
+            } catch (error) {
+                console.log(error);
+                // Rollback transaction
+                await busPool.query('ROLLBACK');
+                res.status(500).json({ message: error.message });
+            } finally {
+                // End transaction
+                await busPool.query('COMMIT');
+            }
+        }
+    });
+
+}
+
+
 
                 
 
@@ -883,8 +1002,6 @@ const getAllBus = async (req, res) => {
     });
 }
 
-
-
 // Get Bus Info
 const getBusNames = async (req, res) => {
     // get the token
@@ -944,207 +1061,6 @@ const getBusNames = async (req, res) => {
             }
         }
     });
-}
-
-// // Get bus details, schedule details by bus id
-// const getBusLayout = async (req, res) => {
-//     // get the token
-//     console.log(req.body)
-//     const {token, busId, busCoachId, adminUsername} = req.body;
-//     if (!token) {
-//         return res.status(401).json({ message: 'No token provided' });
-//     }
-
-//     // verify the token
-//     console.log("token", token)
-//     console.log("secretKey", secretKey)
-
-//     jwt.verify(token, secretKey, async (err, decoded) => {
-//         if (err) {
-//             console.log("Unauthorized access");
-//             res.status(401).json({ message: 'Unauthorized access: token invalid' });
-//         } else {
-//             try {
-//                 console.log("getBusLayout called from bus-service");
-//                 // Check if admin has bus admin role or admin role
-//                 const checkQuery = {
-//                     text: 'SELECT admin_info.admin_id, admin_role_info.admin_role_name FROM admin_info INNER JOIN admin_role_info ON admin_info.admin_role_id = admin_role_info.admin_role_id WHERE admin_info.username = $1',
-//                     values: [adminUsername]
-//                 };
-//                 const checkResult = await accountPool.query(checkQuery);
-//                 if (checkResult.rows.length === 0) {
-//                     console.log("Admin does not exist");
-//                     return res.status(400).json({ message: 'Admin does not exist' });
-//                 }
-//                 const adminRole = checkResult.rows[0].admin_role_name;
-//                 const adminId = checkResult.rows[0].admin_id;
-//                 if (adminRole !== 'ADMIN' && adminRole !== 'BUS ADMIN') {
-//                     console.log("Unauthorized access");
-//                     return res.status(401).json({ message: 'Unauthorized access: admin role invalid' });
-//                 }
-
-//                 let queryText = `SELECT bus_coach_info.bus_id, bus_coach_info.bus_coach_id, bus_coach_info.coach_name, 
-//                                 bus_layout_info.bus_layout_id, bus_layout_info.number_of_seats, 
-//                                 bus_layout_info.matrix_rows, bus_layout_info.matrix_cols 
-//                                 FROM bus_coach_info INNER JOIN bus_layout_info ON bus_coach_info.bus_coach_id = bus_layout_info.bus_coach_id 
-//                                 WHERE bus_coach_info.bus_id = $1 AND bus_coach_info.bus_coach_id = $2`;
-//                 let queryValues = [busId, busCoachId];
-//                 if (adminRole === 'BUS ADMIN') {
-//                     queryText += ' AND $3 = ANY(bus_services.admin_id)';
-//                     queryValues.push(adminId);
-//                 }
-
-//                 // Get bus_id, bus_name, coach_id, coach_name, total_number_of_buses, number_of_buses from bus_services table and bus_coach_info table
-//                 const query = {
-//                     text: queryText,
-//                     values: queryValues
-//                 };
-//                 const result = await busPool.query(query);
-//                 let busInfo = result.rows;
-
-//                 if (busInfo.length === 0) {
-//                     return res.status(200).json([]);
-//                 }
-
-//                 for (let i = 0; i < busInfo.length; i++) {
-//                     let layout = busInfo[i];
-//                     // Get seat details for each layout
-//                     let seatQuery = {
-//                         text: `SELECT bus_seat_details.seat_name, bus_seat_details.is_seat, bus_seat_details.matrix_row_id, bus_seat_details.matrix_col_id
-//                         FROM bus_seat_details WHERE bus_seat_details.bus_layout_id = $1`,
-//                         values: [layout.bus_layout_id]
-//                     };
-
-//                     const seatResult = await busPool.query(seatQuery);
-//                     let seatDetails = seatResult.rows;
-//                     let matrix = [];
-//                     for (let i = 0; i < layout.matrix_rows; i++) {
-//                         matrix.push(new Array(layout.matrix_cols).fill(0));
-//                     }
-//                     for (let i = 0; i < seatDetails.length; i++) {
-//                         let seat = seatDetails[i];
-//                         if (seat.is_seat) {
-//                             matrix[seat.matrix_row_id][seat.matrix_col_id] = 1;
-//                         }
-//                     }
-//                     layout.matrix = matrix;
-//                 }
-//                 console.log(busInfo[0]);                
-//                 res.status(200).json(busInfo[0]);
-//             } catch(error) {
-//                 console.log(error);
-//                 res.status(500).json({ message: error.message })
-//             }
-//         }
-//     });
-// }
-
-// Add bus schedule info with bus id, source, destination, departure time, arrival time, fare and date
-const addBusScheduleInfo = async (req, res) => {
-    // get the token
-    // console.log(req)
-    const {token} = req.body;
-
-    if (!token) {
-        return res.status(401).json({ message: 'No token provided' });
-    }
-
-    // verify the token
-    console.log("token", token)
-    console.log("secretKey", secretKey)
-
-    jwt.verify(token, secretKey, async (err, decoded) => {
-        if (err) {
-            console.log("Unauthorized access: token invalid");
-            res.status(401).json({ message: 'Unauthorized access: token invalid' });
-        } else {
-            try {
-                // Begin transaction
-                await busPool.query('BEGIN');
-                console.log("addBusScheduleInfo called from bus-service");
-
-                const {schedule, busId, adminUsername} = req.body;
-                // Check if admin has bus admin role or admin role
-                const checkQuery = {
-                    text: 'SELECT admin_info.admin_id, admin_role_info.admin_role_name FROM admin_info INNER JOIN admin_role_info ON admin_info.admin_role_id = admin_role_info.admin_role_id WHERE admin_info.username = $1',
-                    values: [adminUsername]
-                };
-
-                
-                for (let i = 0; i < schedule.length; i++) {
-                    const {date, timeWiseInfo} = schedule[i];
-                    for (let j = 0; j < timeWiseInfo.length; j++) {
-                        const {departureTime, arrivingTime, coachId, fare, source, destination} = timeWiseInfo[j];
-                        // Check if bus schedule already exists
-                        const checkQuery = {
-                            text: 'SELECT * FROM bus_schedule_info WHERE bus_id = $1 AND source = $2 AND destination = $3 AND departure_time = $4 AND coach_id = $5 AND schedule_date = $6',
-                            values: [busId, source, destination, departureTime, coachId, date]
-                        };
-                        const checkResult = await busPool.query(checkQuery);
-                        if (checkResult.rows.length > 0) {
-                            console.log("Bus schedule already exists");
-
-                            // Rollback transaction
-                            await busPool.query('ROLLBACK');
-                            return res.status(400).json({ message: 'Bus schedule already exists' });
-                        }
-                        
-                        // Check if bus layout exists
-                        const checkQuery2 = {
-                            text: 'SELECT * FROM bus_layout_info WHERE bus_id = $1 AND coach_id = $2',
-                            values: [busId, coachId]
-                        };
-                        const checkResult2 = await busPool.query(checkQuery2);
-                        if (checkResult2.rows.length === 0) {
-                            console.log("Bus layout does not exist");
-                            // Rollback transaction
-                            await busPool.query('ROLLBACK');
-                            return res.status(400).json({ message: 'Bus layout does not exist' });
-                        }
-
-                        // Get the bus layout id
-                        const busLayoutId = checkResult2.rows[0].bus_layout_id;
-
-                        // Add bus schedule info
-                        const query = {
-                            text: 'INSERT INTO bus_schedule_info (bus_id, source, destination, departure_time, arrival_time, bus_fare, coach_id, schedule_date) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
-                            values: [busId, source, destination, departureTime, arrivingTime, fare, coachId, date]
-                        };
-                        await busPool.query(query);
-                        console.log("Bus schedule added");
-
-                        // Get the bus schedule id
-                        const getQuery = {
-                            text: 'SELECT * FROM bus_schedule_info WHERE bus_id = $1 AND source = $2 AND destination = $3 AND departure_time = $4 AND coach_id = $5 AND schedule_date = $6',
-                            values: [busId, source, destination, departureTime, coachId, date]
-                        };
-                        const getResult = await busPool.query(getQuery);
-                        const busScheduleId = getResult.rows[0].bus_schedule_id;
-
-                        // Insert into bus schedule seat info table with bus schedule id and bus layout id and the seat details selecting from seat details table with bus layout id
-                        const insertQuery = {
-                            text: 'INSERT INTO bus_schedule_seat_info (bus_schedule_id, bus_layout_id, bus_seat_id) SELECT $1, $2, bus_seat_id FROM bus_seat_details WHERE bus_layout_id = $3 and is_seat = 1',
-                            values: [busScheduleId, busLayoutId, busLayoutId]
-                        };
-                        await busPool.query(insertQuery);
-                        console.log("Bus schedule seat info added");
-                    }
-                }
-
-                console.log("Bus schedule details added");
-                res.status(200).json({ message: 'Bus schedule added' });
-            } catch (error) {
-                console.log(error);
-                // Rollback transaction
-                await busPool.query('ROLLBACK');
-                res.status(500).json({ message: error.message });
-            } finally {
-                // End transaction
-                await busPool.query('COMMIT');
-            }
-        }
-    });
-
 }
 
 // Get schedule wise bus details: bus name, coach name, source, destination, departure time, bus fare from bus schedule info table, bus info table, coach info table
@@ -1273,4 +1189,5 @@ module.exports = {
     getAllUniqueBus,
     getLocation,
     getAvailableBus,
+    addBusScheduleInfo,
 }
