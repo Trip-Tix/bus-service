@@ -484,7 +484,7 @@ const getBusLayout = async (req, res) => {
                     let seatQuery = {
                         text: `SELECT bus_seat_details.seat_name, bus_seat_details.is_seat, bus_seat_details.row_id, bus_seat_details.col_id
                         FROM bus_seat_details WHERE bus_seat_details.bus_layout_id = $1`,
-                        values: [layoutInfo.busLayoutId]
+                        values: [layoutInfo.bus_layout_id]
                     };
 
                     const seatResult = await busPool.query(seatQuery);
@@ -495,8 +495,8 @@ const getBusLayout = async (req, res) => {
                     }
                     for (let i = 0; i < seatDetails.length; i++) {
                         let seat = seatDetails[i];
-                        if (seat.isSeat) {
-                            layout[seat.rowId][seat.colId] = 1;
+                        if (seat.is_seat) {
+                            layout[seat.row_id][seat.col_id] = 1;
                         }
                     }
                     layoutInfo.layout = layout;
