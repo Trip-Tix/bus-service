@@ -655,6 +655,42 @@ const getAllUniqueBus = async (req, res) => {
     });
 }
 
+// Get districts
+const getLocation = async (req, res) => {
+    // get the token
+    // console.log(req)
+    const {token} = req.body;
+    if (!token) {
+        console.log("No token provided");
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access: token invalid");
+            res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        } else {
+            try {
+                console.log("getDistricts called from bus-service");
+                const query = {
+                    text: 'SELECT * FROM location_info'
+                };
+                const result = await busPool.query(query);
+                const districts = result.rows;
+                console.log(districts);
+                res.status(200).json(districts);
+            } catch (error) {
+                console.log(error);
+                res.status(500).json({ message: error.message });
+            }
+        }
+    });
+}
+
 //Get all bus
 const getAllBus = async (req, res) => {
     // get the token
@@ -1107,4 +1143,5 @@ module.exports = {
     getBusLayout,
     getBusInfo,
     getAllUniqueBus,
+    getLocation,
 }
