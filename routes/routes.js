@@ -22,6 +22,12 @@ router.post('/api/admin/getBrandInfo', bodyParser, adminBusController.getBrandIn
 // Add bus from admin
 router.post('/api/admin/addBusInfo', bodyParser, adminBusController.addBusInfo);
 
+// Get bus info from admin
+router.post('/api/admin/getBusInfo', bodyParser, adminBusController.getBusInfo);
+
+// Get all unique bus id list from admin
+router.post('/api/admin/getAllUniqueBus', bodyParser, adminBusController.getAllUniqueBus);
+
 // // Get bus info from admin
 // router.post('/api/admin/getBusNames', bodyParser, adminBusController.getBusNames);
 
