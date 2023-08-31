@@ -1,6 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser').json();
 const adminBusController = require('../controllers/adminBusController');
+const userBusController = require('../controllers/userBusController');
 
 const router = express.Router();
 
@@ -48,5 +49,8 @@ router.post('/api/admin/addBusScheduleInfo', bodyParser, adminBusController.addB
 
 // // Remove bus schedule info from admin
 // router.post('/api/admin/removeBusScheduleInfo', bodyParser, adminBusController.removeBusScheduleInfo);
+
+// Get schedule wise bus details from user
+router.post('/api/getScheduleWiseBusDetails', bodyParser, userBusController.getScheduleWiseBusDetails);
 
 module.exports = router;
