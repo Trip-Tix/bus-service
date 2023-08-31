@@ -934,6 +934,86 @@ const addBusScheduleInfo = async (req, res) => {
 
 }
 
+// Get unique bus schedule info
+const getUniqueBusScheduleInfo = async (req, res) => {
+    // get the token
+    // console.log(req)
+    const {token, busCompanyName, uniqueBusId} = req.body;
+    if (!token) {
+        console.log("No token provided");
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access: token invalid");
+            res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        } else {
+            try {
+                console.log("getUniqueBusScheduleInfo called from bus-service");
+                console.log(req.body);
+
+                // Get the bus id from bus company name
+                const busIdQuery = {
+                    text: 'SELECT bus_id FROM bus_services WHERE bus_company_name = $1',
+                    values: [busCompanyName]
+                };
+                const busIdResult = await busPool.query(busIdQuery);
+                const busId = busIdResult.rows[0].bus_id;
+                console.log("Bus id", busId);
+
+                // Get the bus schedule info from bus schedule info table
+                const busScheduleInfoQuery = {
+                    text: `SELECT bus_schedule_id, starting_point, ending_point, destination_points, departure_time, bus_fare, schedule_date FROM bus_schedule_info WHERE bus_id = $1 AND unique_bus_id = $2`,
+                    values: [busId, uniqueBusId]
+                };
+                const busScheduleInfoResult = await busPool.query(busScheduleInfoQuery);
+                const busScheduleInfo = busScheduleInfoResult.rows;
+                console.log(busScheduleInfo);
+
+                for (let i = 0; i < busScheduleInfo.length; i++) {
+                    let scheduleInfo = busScheduleInfo[i];
+                    const busScheduleId = scheduleInfo.bus_schedule_id;
+
+                    // Get the booked count from bus schedule seat info table
+                    const bookedCountQuery = {
+                        text: 'SELECT COUNT(*) FROM bus_schedule_seat_info WHERE bus_schedule_id = $1 AND booked_status = 1',
+                        values: [busScheduleId]
+                    };
+                    const bookedCountResult = await busPool.query(bookedCountQuery);
+                    const bookedCount = bookedCountResult.rows[0].count;
+                    
+                    busScheduleInfo[i].bookedCount = bookedCount;
+
+                    // Get the total count from bus schedule seat info table
+                    const totalCountQuery = {
+                        text: 'SELECT COUNT(*) FROM bus_schedule_seat_info WHERE bus_schedule_id = $1',
+                        values: [busScheduleId]
+                    };
+                    const totalCountResult = await busPool.query(totalCountQuery);
+                    const totalCount = totalCountResult.rows[0].count;
+
+                    busScheduleInfo[i].totalCount = totalCount;
+                }
+                console.log(busScheduleInfo);
+                res.status(200).json(busScheduleInfo);
+            } catch (error) {
+                console.log(error);
+                res.status(500).json({ message: error.message });
+            }
+        }
+    });
+}
+
+
+
+                
+
+
+
 
 
                 
@@ -1190,4 +1270,5 @@ module.exports = {
     getLocation,
     getAvailableBus,
     addBusScheduleInfo,
+    getUniqueBusScheduleInfo,
 }

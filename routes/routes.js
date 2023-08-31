@@ -38,6 +38,9 @@ router.post('/api/admin/getAvailableBus', bodyParser, adminBusController.getAvai
 // Add bus schedule info from admin
 router.post('/api/admin/addBusScheduleInfo', bodyParser, adminBusController.addBusScheduleInfo);
 
+// Get bus schedule info from admin
+router.post('/api/admin/getUniqueBusScheduleInfo', bodyParser, adminBusController.getUniqueBusScheduleInfo);
+
 // // Get bus info from admin
 // router.post('/api/admin/getBusNames', bodyParser, adminBusController.getBusNames);
 
