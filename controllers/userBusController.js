@@ -178,6 +178,140 @@ const getScheduleWiseBusDetails = async (req, res) => {
     }
 }
 
+// Get unique bus details
+const getUniqueBusDetails = async (req, res) => {
+    console.log('getUniqueBusDetails called from bus-service');
+
+    // Get the token
+    const {token, uniqueBusId, busId, busScheduleId} = req.body;
+    if (!token) {
+        console.log("No token provided");
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // Verify the token
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Failed to authenticate token");
+            return res.status(500).json({ message: 'Failed to authenticate token' });
+        }
+
+        // Get the bus coach id 
+        const getBusCoachIdQuery = {
+            text: `SELECT bus_coach_info.bus_coach_id, bus_coach_details.coach_id, bus_coach_details.brand_name_id 
+            FROM bus_coach_info
+            INNER JOIN bus_coach_details ON bus_coach_info.coach_id = bus_coach_details.coach_id 
+            AND bus_coach_info.bus_id = bus_coach_details.bus_id 
+            AND bus_coach_info.brand_name_id = bus_coach_details.brand_name_id
+            WHERE bus_coach_details.unique_bus_id = $1
+            AND bus_coach_details.bus_id = $2`,
+            values: [uniqueBusId, busId]
+        }
+        const getBusCoachIdResult = await busPool.query(getBusCoachIdQuery);
+        const busCoachId = getBusCoachIdResult.rows[0].bus_coach_id;
+        console.log('busCoachId: ', busCoachId);
+
+        // Get the bus layout id
+        const getBusLayoutIdQuery = {
+            text: `SELECT bus_layout_id, number_of_seats, row, col
+            FROM bus_layout_info
+            WHERE bus_coach_id = $1
+            AND bus_id = $2`,
+            values: [busCoachId, busId]
+        }
+        const getBusLayoutIdResult = await busPool.query(getBusLayoutIdQuery);
+        const busLayoutId = getBusLayoutIdResult.rows[0].bus_layout_id;
+        const numberOfSeats = getBusLayoutIdResult.rows[0].number_of_seats;
+        const row = getBusLayoutIdResult.rows[0].row;
+        const col = getBusLayoutIdResult.rows[0].col;
+        let availableSeatCount = numberOfSeats;
+        console.log('busLayoutId: ', busLayoutId);
+
+        // Get the seat details
+        const getSeatDetailsQuery = {
+            text: `SELECT bus_seat_id, seat_name, is_seat, row_id, col_id
+            FROM bus_seat_details
+            WHERE bus_layout_id = $1`,
+            values: [busLayoutId]
+        }
+        const getSeatDetailsResult = await busPool.query(getSeatDetailsQuery);
+        const seatDetails = getSeatDetailsResult.rows;
+
+        // Get the schedule seat details
+        const getScheduleSeatDetailsQuery = {
+            text: `SELECT bus_schedule_seat_id, bus_seat_id, booked_status, passenger_id 
+            FROM bus_schedule_seat_info
+            WHERE bus_schedule_id = $1 
+            AND bus_layout_id = $2`,
+            values: [busScheduleId, busLayoutId]
+        }
+        const getScheduleSeatDetailsResult = await busPool.query(getScheduleSeatDetailsQuery);
+        const scheduleSeatDetails = getScheduleSeatDetailsResult.rows;
+
+        let layout = [];
+        for (let i = 0; i < row; i++) {
+            layout.push(new Array(col).fill(0));
+        }
+
+        let seatName = [];
+        for (let i = 0; i < row; i++) {
+            seatName.push(new Array(col).fill(""));
+        }
+
+        for (let i = 0; i < seatDetails.length; i++) {
+            let seat = seatDetails[i];
+            console.log('seat: ', seat);
+            if (seat.is_seat) {
+                layout[seat.row_id][seat.col_id] = 1;
+                seatName[seat.row_id][seat.col_id] = seat.seat_name;
+            }
+        }
+
+        for (let i = 0; i < scheduleSeatDetails.length; i++) {
+            let seat = scheduleSeatDetails[i];
+            if (seat.booked_status === 1) {
+                // Temporary Booked
+                availableSeatCount--;
+                let seatId = seat.bus_seat_id;
+                for (let j = 0; j < seatDetails.length; j++) {
+                    if (seatId === seatDetails[j].bus_seat_id) {
+                        if (seat.passenger_gender === "M") {
+                            layout[seatDetails[j].row_id][seatDetails[j].col_id] = 4;
+                        } else {
+                            layout[seatDetails[j].row_id][seatDetails[j].col_id] = 5;
+                        }
+                        break;
+                    }
+                }
+            } else if (seat.booked_status === 2) {
+                // Permanent Booked
+                availableSeatCount--;
+                let seatId = seat.bus_seat_id;
+                for (let j = 0; j < seatDetails.length; j++) {
+                    if (seatId === seatDetails[j].bus_seat_id) {
+                        if (seat.passenger_gender === "M") {
+                            layout[seatDetails[j].row_id][seatDetails[j].col_id] = 2;
+                        } else {
+                            layout[seatDetails[j].row_id][seatDetails[j].col_id] = 3;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+
+        console.log('layout: ', layout);
+        console.log('seatName: ', seatName);
+
+        return res.status(200).json({layout, seatName, numberOfSeats, availableSeatCount});
+    });
+}
+
+
+
+
+
+
 // // Temporary book seat
 // const tempBookSeat = async (req, res) => {
 //     // get the token
@@ -188,5 +322,6 @@ const getScheduleWiseBusDetails = async (req, res) => {
 //     }
 
 module.exports = {
-    getScheduleWiseBusDetails
+    getScheduleWiseBusDetails,
+    getUniqueBusDetails
 }
