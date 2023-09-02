@@ -21,7 +21,7 @@ const getScheduleWiseBusDetails = async (req, res) => {
 
     try {
         const getBusDetailsQuery = {
-            text: `SELECT unique_bus_id, bus_id, bus_schedule_id, bus_fare, destination_points   
+            text: `SELECT unique_bus_id, bus_id, bus_schedule_id, bus_fare, destination_points, departure_time    
             FROM bus_schedule_info 
             WHERE starting_point = $1 
             AND $2 = ANY(destination_points) 
@@ -44,6 +44,27 @@ const getScheduleWiseBusDetails = async (req, res) => {
             const busScheduleId = busDetails[i].bus_schedule_id;
             const fare = busDetails[i].bus_fare;
             const destinationPoints = busDetails[i].destination_points;
+
+            // Change the departure time format to hh:mm AM/PM
+            const departureTime = busDetails[i].departure_time;
+            const departureTimeParts = departureTime.split(':');
+            let hour = parseInt(departureTimeParts[0]);
+            let minute = departureTimeParts[1];
+            let ampm = 'AM';
+            if (hour > 12) {
+                hour -= 12;
+                ampm = 'PM';
+            }
+            if (hour === 12) {
+                ampm = 'PM';
+            }
+            if (hour === 0) {
+                hour = 12;
+            }
+            const departureTimeFormatted = `${hour}:${minute} ${ampm}`;
+            busDetails[i].departure_time = departureTimeFormatted;
+            
+            busDetails[i].arrival_time = "";
     
             for (let j = 0; j < destinationPoints.length; j++) {
                 if (destinationPoints[j] === destination) {
@@ -156,6 +177,15 @@ const getScheduleWiseBusDetails = async (req, res) => {
         return res.status(500).json(error);
     }
 }
+
+// // Temporary book seat
+// const tempBookSeat = async (req, res) => {
+//     // get the token
+//     const {token, busScheduleId, uniqueBusId} = req.body;
+//     if (!token) {
+//         console.log("No token provided");
+//         return res.status(401).json({ message: 'No token provided' });
+//     }
 
 module.exports = {
     getScheduleWiseBusDetails
