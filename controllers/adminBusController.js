@@ -511,21 +511,28 @@ const getBusLayout = async (req, res) => {
     });
 }
 
+// Get bus information
 const getBusInfo = async (req, res) => {
+    // get the token
+    // console.log(req)
     const {token, busCompanyName} = req.body;
     if (!token) {
         return res.status(401).json({ message: 'No token provided' });
     }
 
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
     jwt.verify(token, secretKey, async (err, decoded) => {
         if (err) {
             console.log("Unauthorized access: token invalid");
             return res.status(401).json({ message: 'Unauthorized access: token invalid' });
         }
-
         try {
             console.log("getBusInfo called from bus-service");
-            
+            console.log(req.body);
+
+            // Get the bus id from bus company name
             const busIdQuery = {
                 text: 'SELECT bus_id, coach_info FROM bus_services WHERE bus_company_name = $1',
                 values: [busCompanyName]
@@ -534,6 +541,7 @@ const getBusInfo = async (req, res) => {
             const busId = busIdResult.rows[0].bus_id;
             // a set to avoid duplicates
             const coachInfoSet = new Set(busIdResult.rows[0].coach_info); 
+            console.log("Bus id", busId);
 
             let result = [];
 
@@ -553,10 +561,11 @@ const getBusInfo = async (req, res) => {
                 const brandInfo = brandInfoResult.rows;
 
                 for (let brand of brandInfo) {
+                    let layoutId = brand.bus_layout_id;
                     const seatQuery = {
                         text: `SELECT bus_seat_details.seat_name, bus_seat_details.is_seat, bus_seat_details.row_id, bus_seat_details.col_id
                         FROM bus_seat_details WHERE bus_seat_details.bus_layout_id = $1`,
-                        values: [brand.bus_layout_id]
+                        values: [layoutId]
                     };
                     const seatResult = await busPool.query(seatQuery);
                     let seatDetails = seatResult.rows;
@@ -571,6 +580,7 @@ const getBusInfo = async (req, res) => {
                 }
             }
 
+            console.log(result);
             res.status(200).json(result);
         } catch (error) {
             console.log(error);
