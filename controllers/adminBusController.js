@@ -511,88 +511,70 @@ const getBusLayout = async (req, res) => {
     });
 }
 
-// Get bus information
 const getBusInfo = async (req, res) => {
-    // get the token
-    // console.log(req)
     const {token, busCompanyName} = req.body;
     if (!token) {
         return res.status(401).json({ message: 'No token provided' });
     }
 
-    // verify the token
-    console.log("token", token)
-    console.log("secretKey", secretKey)
     jwt.verify(token, secretKey, async (err, decoded) => {
         if (err) {
             console.log("Unauthorized access: token invalid");
-            res.status(401).json({ message: 'Unauthorized access: token invalid' });
-        } else {
-            try {
-                console.log("getBusInfo called from bus-service");
-                console.log(req.body);
+            return res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        }
 
-                // Get the bus id from bus company name
-                const busIdQuery = {
-                    text: 'SELECT bus_id, coach_info FROM bus_services WHERE bus_company_name = $1',
-                    values: [busCompanyName]
+        try {
+            console.log("getBusInfo called from bus-service");
+            
+            const busIdQuery = {
+                text: 'SELECT bus_id, coach_info FROM bus_services WHERE bus_company_name = $1',
+                values: [busCompanyName]
+            };
+            const busIdResult = await busPool.query(busIdQuery);
+            const busId = busIdResult.rows[0].bus_id;
+            // a set to avoid duplicates
+            const coachInfoSet = new Set(busIdResult.rows[0].coach_info); 
+
+            let result = [];
+
+            for (let coachId of coachInfoSet) {
+                const brandInfoQuery = {
+                    text: `SELECT bus_coach_info.bus_coach_id, bus_coach_info.number_of_bus, brand_name_info.brand_name,
+                            coach_info.coach_name, coach_info.coach_id, bus_layout_info.bus_layout_id, bus_layout_info.number_of_seats,
+                            bus_layout_info.row, bus_layout_info.col 
+                            FROM bus_coach_info
+                            INNER JOIN brand_name_info ON bus_coach_info.brand_name_id = brand_name_info.brand_name_id
+                            INNER JOIN coach_info ON bus_coach_info.coach_id = coach_info.coach_id 
+                            INNER JOIN bus_layout_info ON bus_coach_info.bus_coach_id = bus_layout_info.bus_coach_id
+                            WHERE bus_coach_info.bus_id = $1 AND bus_coach_info.coach_id = $2`,
+                    values: [busId, coachId]
                 };
-                const busIdResult = await busPool.query(busIdQuery);
-                const busId = busIdResult.rows[0].bus_id;
-                const coachInfo = busIdResult.rows[0].coach_info;
-                console.log("Bus id", busId);
+                const brandInfoResult = await busPool.query(brandInfoQuery);
+                const brandInfo = brandInfoResult.rows;
 
-                let result = [];
-
-                for (let i = 0; i < coachInfo.length; i++) {
-                    let coachId = coachInfo[i];
-                    // Get the brand info from bus coach info table
-                    const brandInfoQuery = {
-                        text: `SELECT bus_coach_info.bus_coach_id, bus_coach_info.number_of_bus, brand_name_info.brand_name,
-                                coach_info.coach_name, coach_info.coach_id, bus_layout_info.bus_layout_id, bus_layout_info.number_of_seats,
-                                bus_layout_info.row, bus_layout_info.col 
-                                FROM bus_coach_info
-                                INNER JOIN brand_name_info ON bus_coach_info.brand_name_id = brand_name_info.brand_name_id
-                                INNER JOIN coach_info ON bus_coach_info.coach_id = coach_info.coach_id 
-                                INNER JOIN bus_layout_info ON bus_coach_info.bus_coach_id = bus_layout_info.bus_coach_id
-                                WHERE bus_coach_info.bus_id = $1 AND bus_coach_info.coach_id = $2`,
-                        values: [busId, coachId]
+                for (let brand of brandInfo) {
+                    const seatQuery = {
+                        text: `SELECT bus_seat_details.seat_name, bus_seat_details.is_seat, bus_seat_details.row_id, bus_seat_details.col_id
+                        FROM bus_seat_details WHERE bus_seat_details.bus_layout_id = $1`,
+                        values: [brand.bus_layout_id]
                     };
-                    const brandInfoResult = await busPool.query(brandInfoQuery);
-                    const brandInfo = brandInfoResult.rows;
-
-                    for (let j = 0; j < brandInfo.length; j++) {
-                        let brand = brandInfo[j];
-                        let layoutId = brand.bus_layout_id;
-                        // Get seat details for each layout
-                        let seatQuery = {
-                            text: `SELECT bus_seat_details.seat_name, bus_seat_details.is_seat, bus_seat_details.row_id, bus_seat_details.col_id
-                            FROM bus_seat_details WHERE bus_seat_details.bus_layout_id = $1`,
-                            values: [layoutId]
-                        };
-                        const seatResult = await busPool.query(seatQuery);
-                        let seatDetails = seatResult.rows;
-                        let layout = [];
-                        for (let k = 0; k < brand.row; k++) {
-                            layout.push(new Array(brand.col).fill(0));
+                    const seatResult = await busPool.query(seatQuery);
+                    let seatDetails = seatResult.rows;
+                    let layout = Array(brand.row).fill().map(() => Array(brand.col).fill(0));
+                    for (let seat of seatDetails) {
+                        if (seat.is_seat) {
+                            layout[seat.row_id][seat.col_id] = 1;
                         }
-                        for (let k = 0; k < seatDetails.length; k++) {
-                            let seat = seatDetails[k];
-                            if (seat.is_seat) {
-                                layout[seat.row_id][seat.col_id] = 1;
-                            }
-                        }
-                        brand.layout = layout;
-                        result.push(brand);
                     }
+                    brand.layout = layout;
+                    result.push(brand);
                 }
-
-                console.log(result);
-                res.status(200).json(result);
-            } catch (error) {
-                console.log(error);
-                res.status(500).json({ message: error.message });
             }
+
+            res.status(200).json(result);
+        } catch (error) {
+            console.log(error);
+            res.status(500).json({ message: error.message });
         }
     });
 }
@@ -1257,6 +1239,43 @@ const removeBusScheduleInfo = async (req, res) => {
     });
 }
 
+const getCountOfAllUniqueBuses = async (req, res) => {
+    // get the token from the request body
+    const { token } = req.body;
+    if (!token) {
+        console.log("No token provided");
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access: token invalid");
+            res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        } else {
+            try {
+                console.log("getCountOfAllUniqueBuses called from bus-service");
+
+                // Query the bus_coach_details table to count distinct unique_bus_id
+                const countUniqueBusesQuery = {
+                    text: 'SELECT COUNT(DISTINCT unique_bus_id) FROM bus_coach_details'
+                };
+                const countResult = await busPool.query(countUniqueBusesQuery);
+                const totalCount = countResult.rows[0].count;
+                console.log("Total unique buses:", totalCount);
+                
+                res.status(200).json({ totalUniqueBuses: totalCount });
+            } catch (error) {
+                console.log(error);
+                res.status(500).json({ message: error.message });
+            }
+        }
+    });
+}
+
 
 module.exports = {
     addBusInfo,
@@ -1271,4 +1290,5 @@ module.exports = {
     getAvailableBus,
     addBusScheduleInfo,
     getUniqueBusScheduleInfo,
+    getCountOfAllUniqueBuses,
 }
