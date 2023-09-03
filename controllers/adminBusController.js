@@ -990,14 +990,6 @@ const getUniqueBusScheduleInfo = async (req, res) => {
     });
 }
 
-
-
-                
-
-
-
-
-
                 
 
 //Get all bus

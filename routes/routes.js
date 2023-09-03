@@ -56,12 +56,7 @@ router.post('/api/admin/getUniqueBusScheduleInfo', bodyParser, adminBusControlle
 // Get schedule wise bus details from user
 router.post('/api/getScheduleWiseBusDetails', bodyParser, userBusController.getScheduleWiseBusDetails);
 
-<<<<<<< HEAD
-
-router.post('/api/admin/getAllUniqueBusCount', bodyParser, adminBusController.getCountOfAllUniqueBuses);
-=======
 // Get unique bus details from user
 router.post('/api/getUniqueBusDetails', bodyParser, userBusController.getUniqueBusDetails);
->>>>>>> 0334bdf876c71042c0a665720adf7fa5dda7f027
 
 module.exports = router;
