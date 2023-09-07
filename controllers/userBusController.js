@@ -258,12 +258,18 @@ const getUniqueBusDetails = async (req, res) => {
             seatName.push(new Array(col).fill(""));
         }
 
+        let busSeatId = [];
+        for (let i = 0; i < row; i++) {
+            busSeatId.push(new Array(col).fill(-1));
+        }
+
         for (let i = 0; i < seatDetails.length; i++) {
             let seat = seatDetails[i];
             console.log('seat: ', seat);
             if (seat.is_seat) {
                 layout[seat.row_id][seat.col_id] = 1;
                 seatName[seat.row_id][seat.col_id] = seat.seat_name;
+                busSeatId[seat.row_id][seat.col_id] = seat.bus_seat_id;
             }
         }
 
@@ -302,26 +308,141 @@ const getUniqueBusDetails = async (req, res) => {
 
         console.log('layout: ', layout);
         console.log('seatName: ', seatName);
+        
 
-        return res.status(200).json({layout, seatName, numberOfSeats, availableSeatCount});
+        return res.status(200).json({layout, seatName, busSeatId, numberOfSeats, availableSeatCount});
     });
 }
 
+// Temporary book seat
+const tempBookSeat = async (req, res) => {
+    // get the token
+    console.log(req.body)
+    const {token, busScheduleId, bookingDate, bookingTime, passengerInfo} = req.body;
 
+    if (!token) {
+        console.log("No token provided");
+        return res.status(401).json({ message: 'No token provided' });
+    }
 
+    // Verify the token
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Failed to authenticate token");
+            return res.status(500).json({ message: 'Failed to authenticate token' });
+        }
 
+        try {
+            console.log("Temporary book seat called from bus-service");
+            // Begin transaction
+            await busPool.query('BEGIN');
+            await accountPool.query('BEGIN');
 
+            // Get the timestamp from date and time
+            const bookingTimestamp = new Date(`${bookingDate} ${bookingTime}`).getTime();
 
-// // Temporary book seat
-// const tempBookSeat = async (req, res) => {
-//     // get the token
-//     const {token, busScheduleId, uniqueBusId} = req.body;
-//     if (!token) {
-//         console.log("No token provided");
-//         return res.status(401).json({ message: 'No token provided' });
-//     }
+            console.log('passengerInfo: ', passengerInfo);
+
+            let passengerIdArray = [];
+
+            for (let i = 0; i < passengerInfo.length; i++) {
+                const passenger = passengerInfo[i];
+                const {busSeatId, passengerName, passengerGender, passengerMobile, passengerDob, passengerNid, passengerBirthCertficate} = passenger;
+
+                // Age calculation
+                const passengerDobParts = passengerDob.split('-');
+                const passengerDobYear = parseInt(passengerDobParts[2]);
+                const passengerDobMonth = parseInt(passengerDobParts[1]);
+                const passengerDobDate = parseInt(passengerDobParts[0]);
+
+                const today = new Date();
+                const todayYear = today.getFullYear();
+                const todayMonth = today.getMonth() + 1;
+                const todayDate = today.getDate();
+
+                let age = todayYear - passengerDobYear;
+                if (todayMonth < passengerDobMonth) {
+                    age--;
+                } else if (todayMonth === passengerDobMonth) {
+                    if (todayDate < passengerDobDate) {
+                        age--;
+                    }
+                }
+                console.log('dob: ', passengerDob);
+                console.log('age: ', age);
+    
+                // Check if passenger already exists
+                const checkPassengerQuery = {
+                    text: `SELECT passenger_id FROM passenger_info 
+                    WHERE passenger_nid = $1 
+                    OR passenger_birth_certificate = $2`,
+                    values: [passengerNid, passengerBirthCertficate]
+                }
+                const checkPassengerResult = await accountPool.query(checkPassengerQuery);
+                const passengerResultInfo = checkPassengerResult.rows;
+                let passengerId = -1;
+                if (passengerResultInfo.length === 0) {
+                    // Add passenger
+                    const addPassengerQuery = {
+                        text: `INSERT INTO passenger_info(
+                            passenger_name, passenger_nid, passenger_birth_certificate, 
+                            passenger_passport, passenger_mobile, passenger_gender, passenger_age)
+                            VALUES ($1, $2, $3, $4, $5, $6, $7);`,
+                        values: [passengerName, passengerNid, passengerBirthCertficate, "", passengerMobile, passengerGender, age]
+                    }
+                    await accountPool.query(addPassengerQuery);
+                    console.log('Passenger added successfully');
+    
+                    // Get the passenger id
+                    const getPassengerIdQuery = {
+                        text: `SELECT passenger_id FROM passenger_info
+                        WHERE passenger_nid = $1
+                        OR passenger_birth_certificate = $2`,
+                        values: [passengerNid, passengerBirthCertficate]
+                    }
+                    const getPassengerIdResult = await accountPool.query(getPassengerIdQuery);
+                    passengerId = getPassengerIdResult.rows[0].passenger_id;
+                } else {
+                    passengerId = passengerResultInfo[0].passenger_id;
+                }
+                passengerIdArray.push(passengerId);
+
+                // Generate unique ticket ID of 15 characters length with numbers only
+                const ticketId = Math.random().toString().substring(2, 17);
+    
+                // Temporary book seat
+                const tempBookSeatQuery = {
+                    text: `UPDATE bus_schedule_seat_info
+                    SET booked_status = 1, passenger_id = $1, passenger_gender = $2, booking_time = $3, ticket_id = $4  
+                    WHERE bus_schedule_id = $5
+                    AND bus_seat_id = $6`,
+                    values: [passengerId, passengerGender, bookingTimestamp, ticketId, busScheduleId, busSeatId]
+                }
+                await busPool.query(tempBookSeatQuery);
+            }
+            console.log('Temporary booked successfully');
+            res.status(200).json({ 
+                ticketId,
+                passengerIdArray,
+                busScheduleId,
+                message: "Temporary booked successfully"
+            });
+        } catch (error) {
+            // Rollback transaction
+            await busPool.query('ROLLBACK');
+            await accountPool.query('ROLLBACK');
+            console.log('error here: ', error);
+            res.status(500).json(error);
+        } finally {
+            // Commit transaction
+            await busPool.query('COMMIT');
+            await accountPool.query('COMMIT');
+        }
+    });
+}
 
 module.exports = {
     getScheduleWiseBusDetails,
-    getUniqueBusDetails
+    getUniqueBusDetails,
+    tempBookSeat,
 }

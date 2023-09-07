@@ -59,4 +59,10 @@ router.post('/api/getScheduleWiseBusDetails', bodyParser, userBusController.getS
 // Get unique bus details from user
 router.post('/api/getUniqueBusDetails', bodyParser, userBusController.getUniqueBusDetails);
 
+// Get unique bus count
+router.post('/api/admin/getUniqueBusCount', bodyParser, adminBusController.getCountOfAllUniqueBuses);
+
+// Temporary book ticket
+router.post('/api/temporaryBookTicket', bodyParser, userBusController.tempBookSeat);
+
 module.exports = router;
