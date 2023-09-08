@@ -2,7 +2,7 @@ const amqp = require('amqplib/callback_api');
 
 async function startAdminCreationConsumer() {
     try {
-        amqp.connect('amqp://triptixadmin:Justdoit007@triptix-rabbitmq-service:5672', (err, connection) => {
+        amqp.connect('amqps://gfzmtwux:Qzlyr2WTcNas33k8M6TJt0ylPDnPLKLI@rat.rmq2.cloudamqp.com/gfzmtwux', (err, connection) => {
             if (err) {
                 throw err;
             }
