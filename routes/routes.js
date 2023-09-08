@@ -65,7 +65,4 @@ router.post('/api/admin/getUniqueBusCount', bodyParser, adminBusController.getCo
 // Temporary book ticket
 router.post('/api/temporaryBookTicket', bodyParser, userBusController.tempBookSeat);
 
-// Check temporary booking
-router.post('/api/checkTemporaryBooking', bodyParser, userBusController.checkTempBookedSeat);
-
 module.exports = router;
