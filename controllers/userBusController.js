@@ -448,9 +448,9 @@ const checkTempBookedSeat = async (req, res) => {
 
     try {
         const checkStatusQuery = {
-            text: `SELECT booked_status, bus_schedule_seat_id, booking_time `
-                `FROM bus_schedule_seat_info `
-                `WHERE booked_status = 1 `,
+            text: `SELECT booked_status, bus_schedule_seat_id, booking_time 
+                FROM bus_schedule_seat_info 
+                WHERE booked_status = 1 `,
             values: []
         }
         const checkStatusResult = await busPool.query(checkStatusQuery);
