@@ -511,7 +511,7 @@ const tempBookSeat = async (req, res) => {
                     ticketId,
                     passengerIdArray,
                     busScheduleId,
-                    totatFare: perValidTicketFare,
+                    totalFare: perValidTicketFare,
                     numberOfTickets: passengerIdArray.length,
                 });
 
@@ -539,7 +539,7 @@ const tempBookSeat = async (req, res) => {
                         ticketId: queueTicketId,
                         passengerIdArray: temporaryPassengerIdArray,
                         busScheduleId,
-                        totatFare: perTempTicketFare,
+                        totalFare: perTempTicketFare,
                         numberOfTickets: temporaryNumberOfTickets,
                     });
                 } 
