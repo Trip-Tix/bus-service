@@ -65,4 +65,6 @@ router.post('/api/admin/getUniqueBusCount', bodyParser, adminBusController.getCo
 // Temporary book ticket
 router.post('/api/temporaryBookTicket', bodyParser, userBusController.tempBookSeat);
 
+router.post('/api/getLocations', bodyParser, userBusController.getLocation);
+
 module.exports = router;

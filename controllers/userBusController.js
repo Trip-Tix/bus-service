@@ -492,8 +492,26 @@ const tempBookSeat = async (req, res) => {
     });
 };
 
+// Get districts
+const getLocation = async (req, res) => {
+    try {
+        console.log("getDistricts called from bus-service");
+        const query = {
+            text: 'SELECT * FROM location_info'
+        };
+        const result = await busPool.query(query);
+        const districts = result.rows;
+        console.log(districts);
+        res.status(200).json(districts);
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: error.message });
+    }
+}
+
 module.exports = {
     getScheduleWiseBusDetails,
     getUniqueBusDetails,
     tempBookSeat,
+    getLocation
 };
