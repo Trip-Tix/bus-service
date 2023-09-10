@@ -325,7 +325,7 @@ const getUniqueBusDetails = async (req, res) => {
 const tempBookSeat = async (req, res) => {
     // get the token
     console.log(req.body);
-    const { token, ticketInfo, userId } = req.body;
+    const { token, ticketInfo, userId, source, destination } = req.body;
 
     if (!token) {
         console.log("No token provided");
@@ -365,14 +365,17 @@ const tempBookSeat = async (req, res) => {
             let grandTotalFare = 0;
             let tempTotalFare = 0;
 
+            let isValidTicketPresent = false;
+            let isInvalidTicketPresent = false;
+
             for (let i = 0; i < ticketInfo.length; i++) {
                 const ticket = ticketInfo[i];
                 const { busScheduleId, passengerInfo } = ticket;
+                const ticketId = Math.random().toString().substring(2, 17);
 
                 console.log("passengerInfo: ", passengerInfo);
 
                 // Generate unique ticket ID of 15 characters length with numbers only
-                const ticketId = Math.random().toString().substring(2, 17);
 
                 // Get the bus ticket fare 
                 const getBusTicketFareQuery = {
@@ -389,10 +392,10 @@ const tempBookSeat = async (req, res) => {
                 let temporaryNumberOfTickets = 0;
 
                 let passengerIdArray = [];
+                
                 let temporaryBusSeatIdArray = [];
                 let temporaryPassengerIdArray = [];
 
-                let isTemporaryBookedTicket = false;
 
                 for (let i = 0; i < passengerInfo.length; i++) {
                     const passenger = passengerInfo[i];
@@ -477,11 +480,13 @@ const tempBookSeat = async (req, res) => {
                     }
 
                     if (isTemp) {
+                        isInvalidTicketPresent = true;
                         perTempTicketFare += busTicketFare;
                         temporaryBusSeatIdArray.push(busSeatId);
                         temporaryPassengerIdArray.push(passengerId);
                         temporaryNumberOfTickets++;
                     } else {
+                        isValidTicketPresent = true;
                         // Temporary booking ticket
                         perValidTicketFare += busTicketFare;
                         passengerIdArray.push(passengerId);
@@ -502,26 +507,34 @@ const tempBookSeat = async (req, res) => {
                         await busPool.query(tempBookSeatQuery);
                         console.log("Seat temporarily booked successfully");
                     }
-                    if (isTemp && !isTemporaryBookedTicket) {
-                        isTemporaryBookedTicket = true;
-                    }
                 }
 
-                responseData.push({
-                    ticketId,
-                    passengerIdArray,
-                    busScheduleId,
-                    totalFare: perValidTicketFare,
-                    numberOfTickets: passengerIdArray.length,
-                });
+                if (isValidTicketPresent) {
+                    const numTickets = passengerIdArray.length;
+                    const insertIntoTicketInfoQuery = {
+                        text: `INSERT INTO ticket_info (ticket_id, user_id, bus_schedule_id, 
+                            number_of_tickets, total_fare, passenger_info, date, source, destination) 
+                            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                        values: [ticketId, userId, busScheduleId, numTickets, perValidTicketFare, passengerIdArray, currentDate, source, destination]
+                    }
+                    await busPool.query(insertIntoTicketInfoQuery);
+                    console.log("Temporary Ticket added successfully");
+                    responseData.push({
+                        ticketId,
+                        passengerIdArray,
+                        busScheduleId,
+                        totalFare: perValidTicketFare,
+                        numberOfTickets: numTickets,
+                    });
+                }
 
-                if (isTemporaryBookedTicket) {
+                if (isInvalidTicketPresent) {
                     // Insert to ticket queue
                     const queueTicketId = Math.random().toString().substring(2, 17);
                     const insertIntoTicketQueueQuery = {
                         text: `INSERT INTO ticket_queue 
-                        (queue_ticket_id, user_id, total_fare, bus_schedule_id, number_of_tickets, passenger_info, bus_seat_id, date)
-                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                        (queue_ticket_id, user_id, total_fare, bus_schedule_id, number_of_tickets, passenger_info, bus_seat_id, date, source, destination)
+                        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
                         values: [
                             queueTicketId,
                             userId,
@@ -531,6 +544,8 @@ const tempBookSeat = async (req, res) => {
                             temporaryPassengerIdArray,
                             temporaryBusSeatIdArray,
                             currentDate,
+                            source,
+                            destination,
                         ],
                     };
                     await busPool.query(insertIntoTicketQueueQuery);
