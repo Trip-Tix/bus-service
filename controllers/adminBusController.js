@@ -11,7 +11,7 @@ const secretKey = process.env.SECRETKEY;
 const addBusInfo = async (req, res) => {
     // get the token
     // console.log(req)
-    const { token, busCompanyName, coachId, brandName, alreadyExist, layout, row, col, numBus, uniqueBusId, numSeat } = req.body;
+    const { token, busCompanyName, coachId, brandName, alreadyExist, layout, row, col, numBus, uniqueBusId, numSeat, facilities } = req.body;
     if (!token) {
         return res.status(401).json({ message: 'No token provided' });
     }
@@ -122,8 +122,8 @@ const addBusInfo = async (req, res) => {
                     
                     // Insert into bus coach info table
                     const busCoachInsertQuery = {
-                        text: 'INSERT INTO bus_coach_info (bus_id, coach_id, brand_name_id, number_of_bus) VALUES ($1, $2, $3, $4)',
-                        values: [busId, coachId, brandNameId, numBus]
+                        text: 'INSERT INTO bus_coach_info (bus_id, coach_id, brand_name_id, number_of_bus, facilities) VALUES ($1, $2, $3, $4, $5)',
+                        values: [busId, coachId, brandNameId, numBus, facilities]
                     };
                     await busPool.query(busCoachInsertQuery);
                     console.log("Bus Coach Info added");
