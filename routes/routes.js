@@ -71,4 +71,7 @@ router.post('/api/getLocations', bodyParser, userBusController.getLocation);
 // Update Bus Status
 router.post('/api/admin/updateBusStatus', bodyParser, adminBusController.updateBusStatus);
 
+// get facilities
+router.post('/api/admin/getBusFacilities', bodyParser, adminBusController.getBusFacilities);
+
 module.exports = router;

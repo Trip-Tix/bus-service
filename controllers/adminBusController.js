@@ -1140,6 +1140,77 @@ const updateBusStatus = async (req, res) => {
 }
 
 
+
+// Get bus facilities
+const getBusFacilities = async (req, res) => {
+    // get the token
+    console.log(req.body)
+    const {token, busCompanyName, coachId, brandName} = req.body;
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access");
+            res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        } else {
+            try {
+                console.log("getBusLayout called from bus-service");
+                console.log(req.body);
+
+                // Get the bus id from bus company name
+                const busIdQuery = {
+                    text: 'SELECT bus_id FROM bus_services WHERE bus_company_name = $1',
+                    values: [busCompanyName]
+                };
+                const busIdResult = await busPool.query(busIdQuery);
+                const busId = busIdResult.rows[0].bus_id;
+                console.log("Bus id", busId);
+
+                // Get the brand id from brand name
+                const brandIdQuery = {
+                    text: 'SELECT brand_name_id FROM brand_name_info WHERE brand_name = $1',
+                    values: [brandName]
+                };
+                const brandNameIdResult = await busPool.query(brandIdQuery);
+                if (brandNameIdResult.rows.length === 0) {
+                    return res.status(200).json([]);
+                }
+                const brandNameId = brandNameIdResult.rows[0].brand_name_id;
+                console.log("Brand id", brandNameId);
+
+                // Get the bus coach id from bus coach info table
+                const busCoachIdQuery = {
+                    text: 'SELECT bus_coach_id FROM bus_coach_info WHERE bus_id = $1 AND coach_id = $2 AND brand_name_id = $3',
+                    values: [busId, coachId, brandNameId]
+                };
+                const busCoachIdResult = await busPool.query(busCoachIdQuery);
+                const busCoachId = busCoachIdResult.rows[0].bus_coach_id;
+                console.log("Bus Coach Id", busCoachId);
+
+                // get facilities from bus_coach_info table based on bus_id and bus_coach_id 
+                const busFacilitiesQuery = {
+                    text: 'SELECT facilities FROM bus_coach_info WHERE bus_id = $1 AND bus_coach_id = $2',
+                    values: [busId, busCoachId]
+                };
+                const busFacilitiesResult = await busPool.query(busFacilitiesQuery);
+                const busFacilities = busFacilitiesResult.rows[0];
+                console.log(busFacilities);
+                res.status(200).json(busFacilities);
+            } catch(error) {
+                console.log(error);
+                res.status(500).json({ message: error.message })
+            }
+        }
+    });
+}
+
+
 module.exports = {
     addBusInfo,
     addCoachInfo,
@@ -1155,4 +1226,5 @@ module.exports = {
     getUniqueBusScheduleInfo,
     getCountOfAllUniqueBuses,
     updateBusStatus,
+    getBusFacilities,
 }
