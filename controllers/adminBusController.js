@@ -1089,7 +1089,7 @@ const getCountOfAllUniqueBuses = async (req, res) => {
 const updateBusStatus = async (req, res) => {
     // get the token
     // console.log(req)
-    const { token, busCompanyName, unique_flight_id, status } = req.body;
+    const { token, busCompanyName, unique_bus_id, status } = req.body;
     if (!token) {
         return res.status(401).json({ message: 'No token provided' });
     }
@@ -1115,12 +1115,12 @@ const updateBusStatus = async (req, res) => {
                 const busId = busIdResult.rows[0].bus_id;
                 console.log("Bus id", busId);
 
-                console.log(status, " ", busId, " ", unique_flight_id);
+                console.log(status, " ", busId, " ", unique_bus_id);
 
                 // update status in bus_coach_details based on bus_id and unique_bus_id
                 const updateStatusQuery = {
                     text: 'UPDATE bus_coach_details SET status = $1 WHERE bus_id = $2 AND unique_bus_id = $3',
-                    values: [status, busId, unique_flight_id]
+                    values: [status, busId, unique_bus_id]
                 };
                 await busPool.query(updateStatusQuery);
 
