@@ -1154,4 +1154,5 @@ module.exports = {
     addBusScheduleInfo,
     getUniqueBusScheduleInfo,
     getCountOfAllUniqueBuses,
+    updateBusStatus,
 }
