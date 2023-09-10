@@ -547,7 +547,7 @@ const getBusInfo = async (req, res) => {
 
             for (let coachId of coachInfoSet) {
                 const brandInfoQuery = {
-                    text: `SELECT bus_coach_info.bus_coach_id, bus_coach_info.number_of_bus, brand_name_info.brand_name,
+                    text: `SELECT bus_coach_info.bus_coach_id, bus_coach_info.number_of_bus, bus_coach_info.facilities, brand_name_info.brand_name,
                             coach_info.coach_name, coach_info.coach_id, bus_layout_info.bus_layout_id, bus_layout_info.number_of_seats,
                             bus_layout_info.row, bus_layout_info.col 
                             FROM bus_coach_info
