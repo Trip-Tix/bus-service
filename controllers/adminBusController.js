@@ -632,7 +632,7 @@ const getAllUniqueBus = async (req, res) => {
                 
                 // Get the unique bus id from bus coach details table
                 const busCoachDetailsQuery = {
-                    text: 'SELECT unique_bus_id FROM bus_coach_details WHERE bus_id = $1 AND coach_id = $2 AND brand_name_id = $3',
+                    text: 'SELECT unique_bus_id, status FROM bus_coach_details WHERE bus_id = $1 AND coach_id = $2 AND brand_name_id = $3',
                     values: [busId, coachId, brandNameId]
                 };
                 const busCoachDetailsResult = await busPool.query(busCoachDetailsQuery);
@@ -1079,6 +1079,61 @@ const getCountOfAllUniqueBuses = async (req, res) => {
             } catch (error) {
                 console.log(error);
                 res.status(500).json({ message: error.message });
+            }
+        }
+    });
+}
+
+
+// Add bus info
+const updateBusStatus = async (req, res) => {
+    // get the token
+    // console.log(req)
+    const { token, busCompanyName, unique_flight_id, status } = req.body;
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access: token invalid");
+            res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        } else {
+            try {
+                // Begin transaction
+                await busPool.query('BEGIN');
+                
+                // get bus_id from bus_services
+                const busIdQuery = {
+                    text: 'SELECT bus_id FROM bus_services WHERE bus_company_name = $1',
+                    values: [busCompanyName]
+                };
+                const busIdResult = await busPool.query(busIdQuery);
+                const busId = busIdResult.rows[0].bus_id;
+                console.log("Bus id", busId);
+
+                console.log(status, " ", busId, " ", unique_flight_id);
+
+                // update status in bus_coach_details based on bus_id and unique_bus_id
+                const updateStatusQuery = {
+                    text: 'UPDATE bus_coach_details SET status = $1 WHERE bus_id = $2 AND unique_bus_id = $3',
+                    values: [status, busId, unique_flight_id]
+                };
+                await busPool.query(updateStatusQuery);
+
+                console.log("Bus Status Updated");
+                res.status(200).json({ message: 'Bus Status Updated' });
+            } catch (error) {
+                // Rollback transaction
+                await busPool.query('ROLLBACK');
+                console.log(error);
+                res.status(500).json({ message: error.message });
+            } finally {
+                // End transaction
+                await busPool.query('COMMIT');
             }
         }
     });

@@ -67,4 +67,8 @@ router.post('/api/temporaryBookTicket', bodyParser, userBusController.tempBookSe
 
 router.post('/api/getLocations', bodyParser, userBusController.getLocation);
 
+
+// Update Bus Status
+router.post('/api/admin/updateBusStatus', bodyParser, adminBusController.updateBusStatus);
+
 module.exports = router;
