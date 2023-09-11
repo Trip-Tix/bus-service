@@ -512,7 +512,7 @@ const tempBookSeat = async (req, res) => {
                     const insertIntoTicketInfoQuery = {
                         text: `INSERT INTO ticket_info (ticket_id, user_id, bus_schedule_id, 
                             number_of_tickets, total_fare, passenger_info, date, source, destination) 
-                            VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
                         values: [ticketId, userId, busScheduleId, numTickets, perValidTicketFare, passengerIdArray, currentDate, source, destination]
                     }
                     await busPool.query(insertIntoTicketInfoQuery);
@@ -542,6 +542,8 @@ const tempBookSeat = async (req, res) => {
                             temporaryPassengerIdArray,
                             temporaryBusSeatIdArray,
                             currentDate,
+                            source,
+                            destination,
                         ],
                     };
                     await busPool.query(insertIntoTicketQueueQuery);
