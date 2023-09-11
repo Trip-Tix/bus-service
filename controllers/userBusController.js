@@ -85,7 +85,7 @@ const getScheduleWiseBusDetails = async (req, res) => {
 
             const getCoachInfoQuery = {
                 text: `SELECT bus_coach_details.coach_id, bus_coach_details.brand_name_id, 
-                coach_info.coach_name, bus_coach_info.bus_coach_id, brand_name_info.brand_name  
+                coach_info.coach_name, bus_coach_info.bus_coach_id, brand_name_info.brand_name, bus_coach_info.facilities   
                 FROM bus_coach_details 
                 INNER JOIN coach_info ON bus_coach_details.coach_id = coach_info.coach_id 
                 INNER JOIN brand_name_info ON bus_coach_details.brand_name_id = brand_name_info.brand_name_id 
@@ -102,10 +102,12 @@ const getScheduleWiseBusDetails = async (req, res) => {
             const coachName = coachInfo.coach_name;
             const busCoachId = coachInfo.bus_coach_id;
             const brandName = coachInfo.brand_name;
+            const facilities = coachInfo.facilities;
 
             busDetails[i].coach_id = coachId;
             busDetails[i].brand_name = brandName;
             busDetails[i].coach_name = coachName;
+            busDetails[i].facilities = facilities;
 
             const getAvailableSeatCountQuery = {
                 text: `SELECT COUNT(*) 
