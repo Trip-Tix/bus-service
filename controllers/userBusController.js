@@ -683,6 +683,22 @@ const cancel = async (req, res) => {
             }
             const insertTicketInfoResult = await busPool.query(insertTicketInfoQuery);
 
+            const expiredSeatIdArray = expiredTicket.bus_seat_id;
+
+            // Update status to 1
+            for (let i = 0; i < expiredSeatIdArray.length; i++) {
+                const updateStatusQuery = {
+                    text: `UPDATE bus_schedule_seat_info
+                            SET user_id = $1, booked_status = 1, ticket_id = $2
+                            WHERE bus_schedule_id = $3
+                            AND bus_seat_id = $4`,
+                    values: [userId, insertTicketInfoResult.rows[0].ticket_id, busScheduleId, expiredSeatIdArray[i]]
+                }
+                await busPool.query(updateStatusQuery);
+            }
+
+            console.log('Ticket cancelled successfully');
+
             // Get user email
             const getUserEmailQuery = {
                 text: `SELECT email
