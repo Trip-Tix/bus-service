@@ -628,6 +628,19 @@ const cancel = async (req, res) => {
             values: [ticketId]
         }
         const getBusScheduleIdResult = await busPool.query(getBusScheduleIdQuery);
+
+        if (getBusScheduleIdResult.rows.length === 0) {
+            // delete from ticket queue
+            const bh = {
+                text: `DELETE FROM ticket_queue
+                        WHERE queue_ticket_id = $1`,
+                values: [ticketId]
+            }
+            await busPool.query(bh);
+
+            return res.status(200).json({ message: 'Ticket cancelled successfully' });
+        }
+
         const busScheduleId = getBusScheduleIdResult.rows[0].bus_schedule_id;
         const bookedStatus = getBusScheduleIdResult.rows[0].booked_status;
 
