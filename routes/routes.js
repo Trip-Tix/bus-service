@@ -77,7 +77,7 @@ router.post('/api/admin/updateBusStatus', bodyParser, adminBusController.updateB
 // get facilities
 router.post('/api/admin/getBusFacilities', bodyParser, adminBusController.getBusFacilities);
 
-router.post('/cancelTicket', bodyParser, userBusController.cancelTicket);
+router.post('/cancelTicket', bodyParser, userBusController.cancel);
 router.post('/api/admin/getAllBusCountUser', bodyParser, adminBusController.getUserCountOfAllUniqueBuses);
 
 module.exports = router;
