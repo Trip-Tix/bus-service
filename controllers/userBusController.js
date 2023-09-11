@@ -11,7 +11,7 @@ const secretKey = process.env.SECRETKEY;
 const getScheduleWiseBusDetails = async (req, res) => {
     console.log("getScheduleWiseBusDetails called from bus-service");
     console.log("req.body: ", req.body);
-    const { source, destination, journeyDate, returnDate } = req.body;
+    const { source, destination, journeyDate } = req.body;
 
     // Parse journeyDate and returnDate
     const journeyDateParts = journeyDate.split("-");
@@ -325,7 +325,7 @@ const getUniqueBusDetails = async (req, res) => {
 const tempBookSeat = async (req, res) => {
     // get the token
     console.log(req.body);
-    const { token, ticketInfo, userId, source, destination } = req.body;
+    const { token, ticketInfo, userId } = req.body;
 
     if (!token) {
         console.log("No token provided");
@@ -370,8 +370,25 @@ const tempBookSeat = async (req, res) => {
 
             for (let i = 0; i < ticketInfo.length; i++) {
                 const ticket = ticketInfo[i];
-                const { busScheduleId, passengerInfo } = ticket;
+                const { busScheduleId, passengerInfo, source, destination } = ticket;
                 const ticketId = Math.random().toString().substring(2, 17);
+
+                // Get source and destination name from location_info table
+                const getSourceNameQuery = {
+                    text: `SELECT location_name FROM location_info WHERE location_id = $1`,
+                    values: [source],
+                };
+                const getSourceNameResult = await busPool.query(getSourceNameQuery);
+                const sourceName = getSourceNameResult.rows[0].location_name;
+
+                const getDestinationNameQuery = {
+                    text: `SELECT location_name FROM location_info WHERE location_id = $1`,
+                    values: [destination],
+                };
+                const getDestinationNameResult = await busPool.query(
+                    getDestinationNameQuery
+                );
+                const destinationName = getDestinationNameResult.rows[0].location_name;
 
                 console.log("passengerInfo: ", passengerInfo);
 
@@ -392,7 +409,7 @@ const tempBookSeat = async (req, res) => {
                 let temporaryNumberOfTickets = 0;
 
                 let passengerIdArray = [];
-                
+
                 let temporaryBusSeatIdArray = [];
                 let temporaryPassengerIdArray = [];
 
@@ -515,7 +532,7 @@ const tempBookSeat = async (req, res) => {
                         text: `INSERT INTO ticket_info (ticket_id, user_id, bus_schedule_id, 
                             number_of_tickets, total_fare, passenger_info, date, source, destination) 
                             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-                        values: [ticketId, userId, busScheduleId, numTickets, perValidTicketFare, passengerIdArray, currentDate, source, destination]
+                        values: [ticketId, userId, busScheduleId, numTickets, perValidTicketFare, passengerIdArray, currentDate, sourceName, destinationName]
                     }
                     await busPool.query(insertIntoTicketInfoQuery);
                     console.log("Temporary Ticket added successfully");
@@ -544,8 +561,8 @@ const tempBookSeat = async (req, res) => {
                             temporaryPassengerIdArray,
                             temporaryBusSeatIdArray,
                             currentDate,
-                            source,
-                            destination,
+                            sourceName,
+                            destinationName,
                         ],
                     };
                     await busPool.query(insertIntoTicketQueueQuery);
