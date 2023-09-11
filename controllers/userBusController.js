@@ -629,6 +629,7 @@ const cancel = async (req, res) => {
         }
         const getBusScheduleIdResult = await busPool.query(getBusScheduleIdQuery);
         const busScheduleId = getBusScheduleIdResult.rows[0].bus_schedule_id;
+        const bookedStatus = getBusScheduleIdResult.rows[0].booked_status;
 
         // Remove from ticket_queue
         const removeFromTicketeueQuery = {
@@ -647,59 +648,61 @@ const cancel = async (req, res) => {
         }
         await busPool.query(updateStatusQuery);
 
-        // Search in ticket_queue with bus_schedule_id
-        const getExpiredBusSeatIdQuery = {
-            text: `SELECT *
+        if (bookedStatus === 1) {
+            // Search in ticket_queue with bus_schedule_id
+            const getExpiredBusSeatIdQuery = {
+                text: `SELECT *
                         FROM ticket_queue
                         WHERE bus_schedule_id = $1 ORDER BY date ASC`,
-            values: [busScheduleId]
-        }
-        const getExpiredBusSeatIdResult = await busPool.query(getExpiredBusSeatIdQuery);
-        const queueInfo = getExpiredBusSeatIdResult.rows;
+                values: [busScheduleId]
+            }
+            const getExpiredBusSeatIdResult = await busPool.query(getExpiredBusSeatIdQuery);
+            const queueInfo = getExpiredBusSeatIdResult.rows;
 
-        if (queueInfo.length === 0) {
-            return res.status(200).json({ message: 'No queue found' });
-        }
+            if (queueInfo.length === 0) {
+                return res.status(200).json({ message: 'No queue found' });
+            }
 
-        // Remove from ticket_queue
-        const removeFromTicketQueueQuery = {
-            text: `DELETE FROM ticket_queue
+            // Remove from ticket_queue
+            const removeFromTicketQueueQuery = {
+                text: `DELETE FROM ticket_queue
                         WHERE queue_ticket_id = $1`,
-            values: [queueInfo[0].queue_ticket_id]
-        }
-        await busPool.query(removeFromTicketQueueQuery);
+                values: [queueInfo[0].queue_ticket_id]
+            }
+            await busPool.query(removeFromTicketQueueQuery);
 
 
-        const expiredTicket = queueInfo[0];
-        const userId = expiredTicket.user_id;
+            const expiredTicket = queueInfo[0];
+            const userId = expiredTicket.user_id;
 
-        // Insert into ticket_info
-        const insertTicketInfoQuery = {
-            text: `INSERT INTO ticket_info (ticket_id, user_id, total_fare, bus_schedule_id, number_of_tickets, passenger_info, date, source, destination)
+            // Insert into ticket_info
+            const insertTicketInfoQuery = {
+                text: `INSERT INTO ticket_info (ticket_id, user_id, total_fare, bus_schedule_id, number_of_tickets, passenger_info, date, source, destination)
                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING ticket_id`,
-            values: [expiredTicket.queue_ticket_id, expiredTicket.user_id, expiredTicket.total_fare, expiredTicket.bus_schedule_id, expiredTicket.number_of_tickets, expiredTicket.passenger_info, expiredTicket.date, expiredTicket.source, expiredTicket.destination]
-        }
-        const insertTicketInfoResult = await busPool.query(insertTicketInfoQuery);
+                values: [expiredTicket.queue_ticket_id, expiredTicket.user_id, expiredTicket.total_fare, expiredTicket.bus_schedule_id, expiredTicket.number_of_tickets, expiredTicket.passenger_info, expiredTicket.date, expiredTicket.source, expiredTicket.destination]
+            }
+            const insertTicketInfoResult = await busPool.query(insertTicketInfoQuery);
 
-        // Get user email
-        const getUserEmailQuery = {
-            text: `SELECT email
+            // Get user email
+            const getUserEmailQuery = {
+                text: `SELECT email
                         FROM user_info
                         WHERE user_id = $1`,
-            values: [userId]
-        }
-        const getUserEmailResult = await accountPool.query(getUserEmailQuery);
-        const userEmail = getUserEmailResult.rows[0].email;
+                values: [userId]
+            }
+            const getUserEmailResult = await accountPool.query(getUserEmailQuery);
+            const userEmail = getUserEmailResult.rows[0].email;
 
-        // Send ticket to user email
-        const mailOptions = {
-            from: 'triptix.sfz@gmail.com',
-            to: userEmail,
-            subject: `${ticketId} Ticket`,
-            text: 'Your ticket is free! Go to dashboard to proceed to payment',
-        };
-        await transporter.sendMail(mailOptions);
-        console.log('Ticket sent to user email');
+            // Send ticket to user email
+            const mailOptions = {
+                from: 'triptix.sfz@gmail.com',
+                to: userEmail,
+                subject: `${ticketId} Ticket`,
+                text: 'Your ticket is free! Go to dashboard to proceed to payment',
+            };
+            await transporter.sendMail(mailOptions);
+            console.log('Ticket sent to user email');
+        }
 
 
         return res.status(200).json({ message: 'Ticket cancelled successfully' });
