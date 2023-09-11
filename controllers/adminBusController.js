@@ -1049,7 +1049,7 @@ const removeBusScheduleInfo = async (req, res) => {
 
 const getCountOfAllUniqueBuses = async (req, res) => {
     // get the token from the request body
-    const { token } = req.body;
+    const { token, busCompanyName } = req.body;
     if (!token) {
         console.log("No token provided");
         return res.status(401).json({ message: 'No token provided' });
@@ -1067,9 +1067,19 @@ const getCountOfAllUniqueBuses = async (req, res) => {
             try {
                 console.log("getCountOfAllUniqueBuses called from bus-service");
 
+                // get the bus id from bus company name
+                const busIdQuery = {
+                    text: 'SELECT bus_id FROM bus_services WHERE bus_company_name = $1',
+                    values: [busCompanyName]
+                };
+                const busIdResult = await busPool.query(busIdQuery);
+                const busId = busIdResult.rows[0].bus_id;
+                console.log("Bus id", busId);
+
                 // Query the bus_coach_details table to count distinct unique_bus_id
                 const countUniqueBusesQuery = {
-                    text: 'SELECT COUNT(DISTINCT unique_bus_id) FROM bus_coach_details'
+                    text: 'SELECT COUNT(DISTINCT unique_bus_id) FROM bus_coach_details where bus_id = $1',
+                    values: [busId]
                 };
                 const countResult = await busPool.query(countUniqueBusesQuery);
                 const totalCount = countResult.rows[0].count;
