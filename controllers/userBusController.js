@@ -373,25 +373,6 @@ const tempBookSeat = async (req, res) => {
                 const { busScheduleId, passengerInfo, source, destination } = ticket;
                 const ticketId = Math.random().toString().substring(2, 17);
 
-                // Get source and destination name from location_info table
-                const getSourceNameQuery = {
-                    text: `SELECT location_name FROM location_info WHERE location_id = $1`,
-                    values: [source],
-                };
-                const getSourceNameResult = await busPool.query(getSourceNameQuery);
-                const sourceName = getSourceNameResult.rows[0].location_name;
-
-                const getDestinationNameQuery = {
-                    text: `SELECT location_name FROM location_info WHERE location_id = $1`,
-                    values: [destination],
-                };
-                const getDestinationNameResult = await busPool.query(
-                    getDestinationNameQuery
-                );
-                const destinationName = getDestinationNameResult.rows[0].location_name;
-
-                console.log("passengerInfo: ", passengerInfo);
-
                 // Generate unique ticket ID of 15 characters length with numbers only
 
                 // Get the bus ticket fare 
@@ -532,7 +513,7 @@ const tempBookSeat = async (req, res) => {
                         text: `INSERT INTO ticket_info (ticket_id, user_id, bus_schedule_id, 
                             number_of_tickets, total_fare, passenger_info, date, source, destination) 
                             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-                        values: [ticketId, userId, busScheduleId, numTickets, perValidTicketFare, passengerIdArray, currentDate, sourceName, destinationName]
+                        values: [ticketId, userId, busScheduleId, numTickets, perValidTicketFare, passengerIdArray, currentDate, source, destination]
                     }
                     await busPool.query(insertIntoTicketInfoQuery);
                     console.log("Temporary Ticket added successfully");
@@ -561,8 +542,6 @@ const tempBookSeat = async (req, res) => {
                             temporaryPassengerIdArray,
                             temporaryBusSeatIdArray,
                             currentDate,
-                            sourceName,
-                            destinationName,
                         ],
                     };
                     await busPool.query(insertIntoTicketQueueQuery);
