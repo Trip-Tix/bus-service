@@ -24,7 +24,7 @@ async function startAdminCreationConsumer() {
                     channel.consume(queueInfo.queue, (message) => {
                         if (message !== null) {
                             const adminData = JSON.parse(message.content.toString());
-                            // Process the adminData in the bus service
+                            // Process the adminData in the air service
                             console.log('Received admin creation message:', adminData);
     
                             channel.ack(message); // Acknowledge the message
@@ -50,7 +50,7 @@ async function startAdminCreationConsumer() {
 //     channel.consume(queueInfo.queue, (message) => {
 //         if (message !== null) {
 //             const adminData = JSON.parse(message.content.toString());
-//             // Process the adminData in the bus service
+//             // Process the adminData in the air service
 //             console.log('Received admin creation message:', adminData);
 
 //             channel.ack(message); // Acknowledge the message

@@ -29,6 +29,9 @@ router.post('/api/admin/getBusInfo', bodyParser, adminBusController.getBusInfo);
 // Get all unique bus id list from admin
 router.post('/api/admin/getAllUniqueBus', bodyParser, adminBusController.getAllUniqueBus);
 
+// Get count of all unique bus
+router.post('/api/admin/getAllUniqueBusCount', bodyParser, adminBusController.getCountOfAllUniqueBuses);
+
 // Get location list from admin
 router.post('/api/admin/getLocation', bodyParser, adminBusController.getLocation);
 
