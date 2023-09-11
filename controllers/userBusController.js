@@ -289,7 +289,7 @@ const getUniqueBusDetails = async (req, res) => {
                 let seatId = seat.bus_seat_id;
                 for (let j = 0; j < seatDetails.length; j++) {
                     if (seatId === seatDetails[j].bus_seat_id) {
-                        if (seat.passenger_gender === "M") {
+                        if (seat.passenger_gender === "Male") {
                             layout[seatDetails[j].row_id][seatDetails[j].col_id] = 4;
                         } else {
                             layout[seatDetails[j].row_id][seatDetails[j].col_id] = 5;
@@ -303,7 +303,7 @@ const getUniqueBusDetails = async (req, res) => {
                 let seatId = seat.bus_seat_id;
                 for (let j = 0; j < seatDetails.length; j++) {
                     if (seatId === seatDetails[j].bus_seat_id) {
-                        if (seat.passenger_gender === "M") {
+                        if (seat.passenger_gender === "Male") {
                             layout[seatDetails[j].row_id][seatDetails[j].col_id] = 2;
                         } else {
                             layout[seatDetails[j].row_id][seatDetails[j].col_id] = 3;
