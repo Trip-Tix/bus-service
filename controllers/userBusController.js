@@ -616,6 +616,8 @@ const cancel = async (req, res) => {
     console.log('checkTempBookedSeat called from bus-service');
     console.log('req.body: ', req.body);
 
+    const { ticketId } = req.body;
+
     try {
 
         // Get the busScheduleId from ticketId
