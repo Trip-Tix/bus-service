@@ -1095,6 +1095,24 @@ const getCountOfAllUniqueBuses = async (req, res) => {
 }
 
 
+const getUserCountOfAllUniqueBuses = async (req, res) => {
+    try {
+        
+        // Query the bus_coach_details table to count distinct unique_bus_id
+        const countUniqueBusesQuery = {
+            text: 'SELECT COUNT(DISTINCT unique_bus_id) FROM bus_coach_details',
+        };
+        const countResult = await busPool.query(countUniqueBusesQuery);
+        const totalCount = countResult.rows[0].count;
+        console.log("Total unique buses:", totalCount);
+        
+        res.status(200).json({ totalUniqueBuses: totalCount });
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: error.message });
+    }
+}
+
 // Add bus info
 const updateBusStatus = async (req, res) => {
     // get the token
@@ -1237,4 +1255,5 @@ module.exports = {
     getCountOfAllUniqueBuses,
     updateBusStatus,
     getBusFacilities,
+    getUserCountOfAllUniqueBuses,
 }
