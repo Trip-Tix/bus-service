@@ -501,14 +501,15 @@ const tempBookSeat = async (req, res) => {
                         passengerIdArray.push(passengerId);
                         const tempBookSeatQuery = {
                             text: `UPDATE bus_schedule_seat_info
-                        SET booked_status = 1, passenger_id = $1, passenger_gender = $2, booking_time = $3, ticket_id = $4  
-                        WHERE bus_schedule_id = $5
-                        AND bus_seat_id = $6`,
+                        SET booked_status = 1, passenger_id = $1, passenger_gender = $2, booking_time = $3, ticket_id = $4, user_id = $5   
+                        WHERE bus_schedule_id = $6
+                        AND bus_seat_id = $7`,
                             values: [
                                 passengerId,
                                 passengerGender,
                                 bookingTimestamp,
                                 ticketId,
+                                userId,
                                 busScheduleId,
                                 busSeatId,
                             ],
@@ -613,7 +614,7 @@ const getLocation = async (req, res) => {
 
 // Check temporary booked seat
 const cancel = async (req, res) => {
-    console.log('checkTempBookedSeat called from bus-service');
+    console.log('cancel called from bus-service');
     console.log('req.body: ', req.body);
 
     const { ticketId } = req.body;
