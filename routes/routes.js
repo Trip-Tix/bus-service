@@ -80,4 +80,7 @@ router.post('/api/admin/getBusFacilities', bodyParser, adminBusController.getBus
 router.post('/cancelTicket', bodyParser, userBusController.cancel);
 router.post('/api/admin/getAllBusCountUser', bodyParser, adminBusController.getUserCountOfAllUniqueBuses);
 
+router.post('/api/admin/getBoardingPoints', bodyParser, adminBusController.getBoardingPoints);
+
+
 module.exports = router;

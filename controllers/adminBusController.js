@@ -1238,6 +1238,54 @@ const getBusFacilities = async (req, res) => {
     });
 }
 
+// Get boarding points
+const getBoardingPoints = async (req, res) => {
+    // get the token
+    console.log(req.body)
+    const {token, busCompanyName, location_name} = req.body;
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    // verify the token
+    console.log("token", token)
+    console.log("secretKey", secretKey)
+
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access");
+            res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        } else {
+            try {
+                console.log("getBoardingPoints called from bus-service");
+                console.log(req.body);
+
+                // Get location_id from location_info table
+                const locationIdQuery = {
+                    text: 'SELECT location_id FROM location_info WHERE location_name = $1',
+                    values: [location_name]
+                };
+                const locationIdResult = await busPool.query(locationIdQuery);
+                const locationId = locationIdResult.rows[0].location_id;
+                console.log("Location id", locationId);
+
+                // Get boarding points from boarding_point_info table where location_id = locationId
+                const boardingPointsQuery = {
+                    text: 'SELECT boarding_point_name FROM boarding_point_info WHERE location_id = $1',
+                    values: [locationId]
+                };
+                const boardingPointsResult = await busPool.query(boardingPointsQuery);  
+                const boardingPoints = boardingPointsResult.rows;
+                console.log(boardingPoints);
+                res.status(200).json(boardingPoints);
+            } catch(error) {
+                console.log(error);
+                res.status(500).json({ message: error.message })
+            }
+        }
+    });
+}
+
 
 module.exports = {
     addBusInfo,
@@ -1256,4 +1304,5 @@ module.exports = {
     updateBusStatus,
     getBusFacilities,
     getUserCountOfAllUniqueBuses,
+    getBoardingPoints,
 }
