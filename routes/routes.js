@@ -84,5 +84,7 @@ router.post('/api/admin/getBoardingPoints', bodyParser, adminBusController.getBo
 
 router.post('/api/admin/getBusUtilization', bodyParser, adminBusController.getBusUtilization);
 
+router.post('/getBusSeatFareStat', bodyParser, userBusController.getBusSeatFareStat);
+
 
 module.exports = router;

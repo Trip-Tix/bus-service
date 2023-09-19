@@ -742,10 +742,117 @@ const cancel = async (req, res) => {
     }
 }
 
+
+const getBusSeatFareStat = async (req, res) => {
+    const { src, dest, date } = req.body;
+
+    try {
+        console.log("getBusSeatFareStat called from bus-service");
+        console.log(req.body);
+
+        const dateParts = date.split('-');
+        const isoDate = `${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`; // yyyy-mm-dd
+
+        // // Get location_id for src and dest
+        // const locationQuery = {
+        //     text: 'SELECT location_id, location_name FROM location_info WHERE location_name IN ($1, $2)',
+        //     values: [src, dest]
+        // };
+        // const locationResult = await busPool.query(locationQuery);
+        // console.log('locationResult: ', locationResult.rows);
+        
+        // const srcId = locationResult.rows.find(row => row.location_name === src).location_id;
+        // const destId = locationResult.rows.find(row => row.location_name === dest).location_id;
+
+        // console.log('srcId: ', srcId);
+        // console.log('destId: ', destId);
+
+        console.log('isoDate: ', isoDate);
+        // Get bus_schedule_id for the given date, src, and dest
+        const scheduleQuery = {
+            text: 'SELECT bus_schedule_id, destination_points FROM bus_schedule_info WHERE starting_point = $1 AND $2 = ANY(destination_points) AND schedule_date = $3',
+            values: [src, dest, isoDate]
+        };
+        
+        const scheduleResult = await busPool.query(scheduleQuery);
+        console.log('scheduleResult: ', scheduleResult.rows);
+
+        if (scheduleResult.rows.length === 0) {
+            return res.status(200).json({
+                totalSeats: 0,
+                bookedSeats: 0,
+                avgFare: 0
+            });
+        }
+
+        
+        let totalSeats = 0;
+        let bookedSeats = 0;
+        let avgFare = 0;
+
+        for (let i = 0; i < scheduleResult.rows.length; i++) {
+            const schedule = scheduleResult.rows[i];
+            const busScheduleId = schedule.bus_schedule_id;
+            const destinationPoints = schedule.destination_points;
+
+            // Get total seats for the bus
+            const seatsQuery = {
+                text: 'SELECT COUNT(bus_seat_id) as booked_seats FROM bus_schedule_seat_info WHERE bus_schedule_id = $1',
+                values: [busScheduleId]
+            };
+            const seatsResult = await busPool.query(seatsQuery);
+            totalSeats += parseInt(seatsResult.rows[0].booked_seats, 10);
+
+            // Get total booked seats for the bus
+            const bookedSeatsQuery = {
+                text: 'SELECT COUNT(bus_seat_id) as booked_seats FROM bus_schedule_seat_info WHERE bus_schedule_id = $1 AND booked_status = 2',
+                values: [busScheduleId]
+            };
+            const bookedSeatsResult = await busPool.query(bookedSeatsQuery);
+            bookedSeats += parseInt(bookedSeatsResult.rows[0].booked_seats, 10);
+
+            // Get average fare for the bus
+            const fareQuery = {
+                text: 'SELECT bus_fare FROM bus_schedule_info WHERE bus_schedule_id = $1',
+                values: [busScheduleId]
+            };
+
+            const fareResult = await busPool.query(fareQuery);
+            const fare = fareResult.rows[0].bus_fare;
+
+            let totalFare = 0;
+            let count = 0;
+
+            for (let i = 0; i < destinationPoints.length; i++) {
+                if (destinationPoints[i] === dest) {
+                    totalFare += fare[i];
+                    count++;
+                }
+            }
+
+            avgFare +=  count > 0 ? totalFare / count : 0;
+            
+        }
+
+        avgFare = avgFare / scheduleResult.rows.length;        
+        
+        res.status(200).json({
+            totalSeats: totalSeats,
+            bookedSeats: bookedSeats,
+            avgFare: avgFare
+        });
+
+    } catch (error) {
+        console.log(error);
+        res.status(500).json({ message: error.message });
+    }
+};
+
 module.exports = {
     getScheduleWiseBusDetails,
     getUniqueBusDetails,
     tempBookSeat,
     getLocation,
-    cancel
+    cancel,
+    getBusSeatFareStat,
 };
