@@ -1285,7 +1285,66 @@ const getBoardingPoints = async (req, res) => {
         }
     });
 }
+// Get bus utilization (Percentage of seats booked vs. total seats) for a specific bus
+const getBusUtilization = async (req, res) => {
+    const { token, busCompanyName } = req.body;
 
+    if (!token) {
+        return res.status(401).json({ message: 'No token provided' });
+    }
+
+    jwt.verify(token, secretKey, async (err, decoded) => {
+        if (err) {
+            console.log("Unauthorized access: token invalid");
+            res.status(401).json({ message: 'Unauthorized access: token invalid' });
+        } else {
+            try {
+                console.log("getBusUtilization called from bus-service");
+                console.log(req.body);
+
+                // Get bus id from bus services table
+                const busIdQuery = {
+                    text: 'SELECT bus_id from bus_services WHERE bus_company_name = $1',
+                    values: [busCompanyName]
+                }
+                const busIdResult = await busPool.query(busIdQuery);
+                const busId = busIdResult.rows[0].bus_id;
+                console.log(busId);
+
+                // Get total seats for the bus from the bus_layout_info table
+                const totalSeatsQuery = {
+                    text: 'SELECT SUM(number_of_seats) as total_seats FROM bus_layout_info WHERE bus_id = $1',
+                    values: [busId]
+                };
+                
+                const totalSeatsResult = await busPool.query(totalSeatsQuery);
+                const totalSeats = totalSeatsResult.rows[0].total_seats;
+                console.log(totalSeats);
+
+                // Get booked seats for the bus from the bus_schedule_seat_info table for today
+                const bookedSeatsQuery = {
+                    text: 'SELECT COUNT(bus_seat_id) as booked_seats FROM bus_schedule_seat_info WHERE bus_schedule_id IN (SELECT bus_schedule_id FROM bus_schedule_info WHERE bus_id = $1 AND schedule_date = CURRENT_DATE) AND booked_status = 2',
+                    values: [busId]
+                };
+                const bookedSeatsResult = await busPool.query(bookedSeatsQuery);
+                const bookedSeats = bookedSeatsResult.rows[0].booked_seats;
+                console.log(bookedSeats);
+
+                // Calculate utilization
+                const utilization = (bookedSeats / totalSeats) * 100;
+
+                res.status(200).json({
+                    totalSeats: totalSeats,
+                    bookedSeats: bookedSeats,
+                    utilization: utilization.toFixed(2) + '%'
+                });
+            } catch (error) {
+                console.log(error);
+                res.status(500).json({ message: error.message });
+            }
+        }
+    });
+}
 
 module.exports = {
     addBusInfo,
@@ -1305,4 +1364,5 @@ module.exports = {
     getBusFacilities,
     getUserCountOfAllUniqueBuses,
     getBoardingPoints,
+    getBusUtilization,
 }
