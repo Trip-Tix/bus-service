@@ -621,6 +621,8 @@ const cancel = async (req, res) => {
 
     try {
 
+        const currentTime = new Date().getTime();
+
         // Get the busScheduleId from ticketId
         const getBusScheduleIdQuery = {
             text: `SELECT bus_schedule_id
@@ -632,12 +634,12 @@ const cancel = async (req, res) => {
 
         if (getBusScheduleIdResult.rows.length === 0) {
             // delete from ticket queue
-            const bh = {
+            const deleteFromQueueQuery = {
                 text: `DELETE FROM ticket_queue
                         WHERE queue_ticket_id = $1`,
                 values: [ticketId]
             }
-            await busPool.query(bh);
+            await busPool.query(deleteFromQueueQuery);
 
             return res.status(200).json({ message: 'Ticket cancelled successfully' });
         }
@@ -645,18 +647,18 @@ const cancel = async (req, res) => {
         const busScheduleId = getBusScheduleIdResult.rows[0].bus_schedule_id;
         const bookedStatus = getBusScheduleIdResult.rows[0].booked_status;
 
-        // Remove from ticket_queue
-        const removeFromTicketeueQuery = {
+        // Remove from ticket_info
+        const removeFromTicketInfoQuery = {
             text: `DELETE FROM ticket_info
                         WHERE ticket_id = $1`,
             values: [ticketId]
         }
-        await busPool.query(removeFromTicketeueQuery);
+        await busPool.query(removeFromTicketInfoQuery);
 
         // Update status to 0
         const updateStatusQuery = {
             text: `UPDATE bus_schedule_seat_info
-                        SET booked_status = 0 
+                        SET booked_status = 0, user_id = NULL, ticket_id = NULL, booking_time = NULL, passenger_id = NULL, passenger_gender = NULL  
                         WHERE ticket_id = $1`,
             values: [ticketId]
         }
@@ -677,17 +679,9 @@ const cancel = async (req, res) => {
                 return res.status(200).json({ message: 'No queue found' });
             }
 
-            // Remove from ticket_queue
-            const removeFromTicketQueueQuery = {
-                text: `DELETE FROM ticket_queue
-                        WHERE queue_ticket_id = $1`,
-                values: [queueInfo[0].queue_ticket_id]
-            }
-            await busPool.query(removeFromTicketQueueQuery);
-
-
             const expiredTicket = queueInfo[0];
             const userId = expiredTicket.user_id;
+
 
             // Insert into ticket_info
             const insertTicketInfoQuery = {
@@ -697,16 +691,24 @@ const cancel = async (req, res) => {
             }
             const insertTicketInfoResult = await busPool.query(insertTicketInfoQuery);
 
+            // Remove from ticket_queue
+            const removeFromTicketQueueQuery = {
+                text: `DELETE FROM ticket_queue
+                                    WHERE queue_ticket_id = $1`,
+                values: [expiredTicket.queue_ticket_id]
+            }
+            await busPool.query(removeFromTicketQueueQuery);
+
             const expiredSeatIdArray = expiredTicket.bus_seat_id;
 
             // Update status to 1
             for (let i = 0; i < expiredSeatIdArray.length; i++) {
                 const updateStatusQuery = {
                     text: `UPDATE bus_schedule_seat_info
-                            SET user_id = $1, booked_status = 1, ticket_id = $2
-                            WHERE bus_schedule_id = $3
-                            AND bus_seat_id = $4`,
-                    values: [userId, insertTicketInfoResult.rows[0].ticket_id, busScheduleId, expiredSeatIdArray[i]]
+                            SET user_id = $1, booked_status = 1, ticket_id = $2, booking_time = $3
+                            WHERE bus_schedule_id = $4
+                            AND bus_seat_id = $5`,
+                    values: [userId, expiredTicket.queue_ticket_id, currentTime, busScheduleId, expiredSeatIdArray[i]]
                 }
                 await busPool.query(updateStatusQuery);
             }
@@ -760,7 +762,7 @@ const getBusSeatFareStat = async (req, res) => {
         // };
         // const locationResult = await busPool.query(locationQuery);
         // console.log('locationResult: ', locationResult.rows);
-        
+
         // const srcId = locationResult.rows.find(row => row.location_name === src).location_id;
         // const destId = locationResult.rows.find(row => row.location_name === dest).location_id;
 
@@ -773,7 +775,7 @@ const getBusSeatFareStat = async (req, res) => {
             text: 'SELECT bus_schedule_id, destination_points FROM bus_schedule_info WHERE starting_point = $1 AND $2 = ANY(destination_points) AND schedule_date = $3',
             values: [src, dest, isoDate]
         };
-        
+
         const scheduleResult = await busPool.query(scheduleQuery);
         console.log('scheduleResult: ', scheduleResult.rows);
 
@@ -785,7 +787,7 @@ const getBusSeatFareStat = async (req, res) => {
             });
         }
 
-        
+
         let totalSeats = 0;
         let bookedSeats = 0;
         let avgFare = 0;
@@ -830,12 +832,12 @@ const getBusSeatFareStat = async (req, res) => {
                 }
             }
 
-            avgFare +=  count > 0 ? totalFare / count : 0;
-            
+            avgFare += count > 0 ? totalFare / count : 0;
+
         }
 
-        avgFare = avgFare / scheduleResult.rows.length;        
-        
+        avgFare = avgFare / scheduleResult.rows.length;
+
         res.status(200).json({
             totalSeats: totalSeats,
             bookedSeats: bookedSeats,
